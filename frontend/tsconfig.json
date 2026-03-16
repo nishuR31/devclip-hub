@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "noUnusedLocals": false,
+    "strict": true,
     "noUnusedParameters": false,
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     },
     "skipLibCheck": true,
     "strictNullChecks": false

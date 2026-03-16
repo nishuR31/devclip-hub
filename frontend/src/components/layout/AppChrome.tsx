@@ -2,6 +2,7 @@ import { Link, Outlet } from "react-router-dom";
 import { Clipboard, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/effects/ThemeToggle";
 
 export function AppChrome() {
   const { isAuthenticated, user } = useAuth();
@@ -11,7 +12,7 @@ export function AppChrome() {
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground glow-primary transition-shadow">
               <Clipboard className="h-4 w-4" />
             </div>
             <span className="text-sm font-bold tracking-tight">
@@ -45,6 +46,7 @@ export function AppChrome() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle compact />
             {isAuthenticated ?
               <>
                 <Link to="/account">

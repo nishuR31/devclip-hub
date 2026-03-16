@@ -142,8 +142,11 @@ cd devclip-hub
 # 2. Install root dependencies (frontend)
 npm install
 
-# 3. Install backend dependencies
-npm install --prefix server
+# 3. Install frontend dependencies
+npm install --prefix frontend
+
+# 4. Install backend dependencies
+npm install --prefix backend
 ```
 
 ---
@@ -153,10 +156,10 @@ npm install --prefix server
 Copy the example file and fill in your values:
 
 ```bash
-cp server/.env.example server/.env
+cp backend/.env.example backend/.env
 ```
 
-See [`server/.env.example`](server/.env.example) for all variables with inline documentation.
+See [`backend/.env.example`](backend/.env.example) for all variables with inline documentation.
 
 **Required before first run:**
 
@@ -202,14 +205,14 @@ The Vite dev server proxies all `/api/*` requests to `localhost:3001` automatica
 To run them separately:
 
 ```bash
-npm run dev:client   # Vite frontend
-npm run dev:server   # tsx watch backend
+npm run dev:frontend   # Vite frontend
+npm run dev:backend    # tsx watch backend
 ```
 
 **First-time DB setup:**
 
 ```bash
-cd server
+cd backend
 npx prisma db push   # Push schema to MongoDB Atlas
 npx prisma generate  # Generate Prisma client
 ```
@@ -223,16 +226,16 @@ npm run build
 # Output: dist/ (frontend only, for Vercel/static deployment)
 
 npm run build:full
-# Output: dist/ (frontend) + server/dist/ (backend)
+# Output: frontend/dist/ + backend/dist/
 ```
 
 Start the production server:
 
 ```bash
-NODE_ENV=production node server/dist/index.js
+NODE_ENV=production node backend/dist/index.js
 ```
 
-Serve the frontend `dist/` directory via a static host, routing all requests to `index.html` for client-side routing.
+Serve the frontend `frontend/dist/` directory via a static host, routing all requests to `index.html` for client-side routing.
 For Vercel deployments, set `VITE_API_BASE_URL` to your separately deployed backend origin.
 
 **Production checklist**

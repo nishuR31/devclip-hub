@@ -12,6 +12,9 @@ import usersRouter from "./routes/users";
 import subscriptionsRouter from "./routes/subscriptions";
 import paymentsRouter from "./routes/payments";
 import webhooksRouter from "./routes/webhooks";
+import clipboardRouter from "./routes/clipboard";
+import snippetsRouter from "./routes/snippets";
+import workspaceRouter from "./routes/workspace";
 
 // Queues
 import { startEmailWorker } from "./queues/email.queue";
@@ -49,6 +52,9 @@ app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/subscriptions", subscriptionsRouter);
 app.use("/api/payments", paymentsRouter);
+app.use("/api/clipboard", clipboardRouter);
+app.use("/api/snippets", snippetsRouter);
+app.use("/api/workspace", workspaceRouter);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {

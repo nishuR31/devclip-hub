@@ -104,37 +104,37 @@ const Index = () => {
     return (
       <div className="flex h-[100dvh] flex-col bg-background text-foreground">
         {/* Mobile header */}
-        <header className="flex items-center h-12 gap-2 px-3 border-b shrink-0">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
           {mobileView !== "main" && (
             <Button
               size="icon"
               variant="ghost"
-              className="w-8 h-8 shrink-0"
+              className="h-8 w-8 shrink-0"
               onClick={() => setMobileView("main")}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          <div className="flex items-center min-w-0 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {mobileView === "main" && (
-              <div className="flex items-center justify-center rounded-md h-7 w-7 bg-primary shrink-0">
-                <Clipboard className="w-4 h-4 text-primary-foreground" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary shrink-0">
+                <Clipboard className="h-4 w-4 text-primary-foreground" />
               </div>
             )}
             <h1 className="text-sm font-bold tracking-tight truncate">
               {mobileTitle[mobileView]}
             </h1>
           </div>
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="ml-auto flex items-center gap-1">
             <Button
               size="icon"
               variant="ghost"
-              className="w-8 h-8"
+              className="h-8 w-8"
               onClick={toggleTheme}
             >
               {darkMode ?
-                <Sun className="w-4 h-4" />
-              : <Moon className="w-4 h-4" />}
+                <Sun className="h-4 w-4" />
+              : <Moon className="h-4 w-4" />}
             </Button>
           </div>
         </header>
@@ -143,9 +143,9 @@ const Index = () => {
         <div className="flex-1 overflow-y-auto">
           {mobileView === "main" && (
             <div className="p-4 space-y-4">
-              <div className="p-6 text-center border rounded-xl bg-card">
-                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-xl bg-primary/10">
-                  <Clipboard className="w-6 h-6 text-primary" />
+              <div className="rounded-xl border bg-card p-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <Clipboard className="h-6 w-6 text-primary" />
                 </div>
                 <h2 className="mb-1.5 text-xl font-bold tracking-tight">
                   DevClipboard Hub
@@ -153,12 +153,12 @@ const Index = () => {
                 <p className="text-xs text-muted-foreground">
                   Clipboard manager & browser data inspector
                 </p>
-                <div className="flex flex-col gap-2 mt-4">
+                <div className="mt-4 flex flex-col gap-2">
                   <Button
                     onClick={clipboard.readClipboard}
-                    className="w-full gap-2"
+                    className="gap-2 w-full"
                   >
-                    <Clipboard className="w-4 h-4" /> Read Clipboard
+                    <Clipboard className="h-4 w-4" /> Read Clipboard
                   </Button>
                   <div className="grid grid-cols-2 gap-2">
                     <Button
@@ -182,26 +182,26 @@ const Index = () => {
                       setMobileView("inspector");
                       browserData.refresh();
                     }}
-                    className="w-full gap-2"
+                    className="gap-2 w-full"
                   >
-                    <Database className="w-4 h-4" /> Inspect Storage
+                    <Database className="h-4 w-4" /> Inspect Storage
                   </Button>
                 </div>
               </div>
 
               {clipboard.currentClipboard && (
-                <div className="p-4 border rounded-xl bg-card animate-fade-in">
-                  <h3 className="mb-2 text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+                <div className="rounded-xl border bg-card p-4 animate-fade-in">
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Current Clipboard
                   </h3>
-                  <pre className="p-3 overflow-y-auto font-mono text-xs break-all whitespace-pre-wrap rounded-lg bg-muted text-foreground/80 max-h-48">
+                  <pre className="rounded-lg bg-muted p-3 font-mono text-xs whitespace-pre-wrap break-all text-foreground/80 max-h-48 overflow-y-auto">
                     {clipboard.currentClipboard}
                   </pre>
                 </div>
               )}
 
               {clipboard.clipboardError && (
-                <div className="p-3 border rounded-lg border-warning/30 bg-warning/5">
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
                   <p className="text-xs text-warning">
                     {clipboard.clipboardError}
                   </p>
@@ -237,7 +237,7 @@ const Index = () => {
                   <button
                     key={stat.label}
                     onClick={stat.tap}
-                    className="p-3 text-center transition-colors border rounded-lg bg-card hover:border-primary/30 active:bg-muted"
+                    className="rounded-lg border bg-card p-3 text-center transition-colors hover:border-primary/30 active:bg-muted"
                   >
                     <stat.icon className="mx-auto mb-1.5 h-4 w-4 text-primary" />
                     <p className="text-lg font-bold">{stat.value}</p>
@@ -248,13 +248,13 @@ const Index = () => {
                 ))}
               </div>
 
-              <div className="p-3 text-center border rounded-lg border-primary/20 bg-primary/5">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-0.5">
                   <Shield className="h-3.5 w-3.5 text-primary" />
                   <span className="text-[10px] font-semibold text-primary">
-                    {workspaceCapabilities.source === "db+redis" ?
-                      "Cloud + Redis Sync"
-                    : "Local Storage Mode"}
+                    {workspaceCapabilities.source === "db+redis"
+                      ? "Cloud + Redis Sync"
+                      : "Local Storage Mode"}
                   </span>
                 </div>
                 {workspaceCapabilities.canUseTeams && (
@@ -314,7 +314,7 @@ const Index = () => {
         </div>
 
         {/* Mobile bottom nav */}
-        <nav className="flex items-center justify-around border-t h-14 shrink-0 bg-card safe-area-bottom">
+        <nav className="flex h-14 shrink-0 items-center justify-around border-t bg-card safe-area-bottom">
           {[
             { key: "main" as const, icon: Home, label: "Home" },
             { key: "clipboard" as const, icon: Clipboard, label: "Clipboard" },
@@ -346,17 +346,17 @@ const Index = () => {
 
   // Desktop layout
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
-      <header className="flex items-center gap-3 px-4 border-b h-11 shrink-0">
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      <header className="flex h-11 shrink-0 items-center gap-3 border-b px-4">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center rounded-md h-7 w-7 bg-primary">
-            <Clipboard className="w-4 h-4 text-primary-foreground" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
+            <Clipboard className="h-4 w-4 text-primary-foreground" />
           </div>
-          <h1 className="hidden text-sm font-bold tracking-tight sm:block">
+          <h1 className="text-sm font-bold tracking-tight hidden sm:block">
             DevClipboard Hub
           </h1>
         </div>
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="ml-auto flex items-center gap-1">
           <Button
             size="icon"
             variant="ghost"
@@ -377,7 +377,7 @@ const Index = () => {
               <PanelRightClose className="h-3.5 w-3.5" />
             : <PanelRight className="h-3.5 w-3.5" />}
           </Button>
-          <div className="w-px h-4 mx-1 bg-border" />
+          <div className="mx-1 h-4 w-px bg-border" />
           <Button
             size="icon"
             variant="ghost"
@@ -421,18 +421,18 @@ const Index = () => {
 
       <div className="flex flex-1 overflow-hidden">
         {leftOpen && (
-          <aside className="flex flex-col overflow-hidden border-r w-72 lg:w-80 shrink-0 animate-fade-in">
+          <aside className="w-72 lg:w-80 shrink-0 border-r flex flex-col animate-fade-in overflow-hidden">
             <Tabs
               value={leftTab}
               onValueChange={(v) => setLeftTab(v as "clipboard" | "snippets")}
               className="flex flex-col h-full"
             >
-              <TabsList className="h-8 mx-3 mt-2 shrink-0">
-                <TabsTrigger value="clipboard" className="h-6 gap-1 text-xs">
-                  <Clipboard className="w-3 h-3" /> Clipboard
+              <TabsList className="mx-3 mt-2 h-8 shrink-0">
+                <TabsTrigger value="clipboard" className="gap-1 text-xs h-6">
+                  <Clipboard className="h-3 w-3" /> Clipboard
                 </TabsTrigger>
-                <TabsTrigger value="snippets" className="h-6 gap-1 text-xs">
-                  <Code2 className="w-3 h-3" /> Snippets
+                <TabsTrigger value="snippets" className="gap-1 text-xs h-6">
+                  <Code2 className="h-3 w-3" /> Snippets
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="clipboard" className="flex-1 overflow-hidden">
@@ -469,23 +469,23 @@ const Index = () => {
           </aside>
         )}
 
-        <main className="flex-1 p-4 overflow-y-auto lg:p-6">
-          <div className="max-w-3xl mx-auto space-y-4 lg:space-y-6">
-            <div className="p-6 text-center border rounded-xl bg-card lg:p-8">
-              <div className="flex items-center justify-center mx-auto mb-4 h-14 w-14 rounded-2xl bg-primary/10">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <div className="mx-auto max-w-3xl space-y-4 lg:space-y-6">
+            <div className="rounded-xl border bg-card p-6 lg:p-8 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                 <Clipboard className="h-7 w-7 text-primary" />
               </div>
-              <h2 className="mb-2 text-xl font-bold tracking-tight lg:text-2xl">
+              <h2 className="mb-2 text-xl lg:text-2xl font-bold tracking-tight">
                 DevClipboard Hub
               </h2>
-              <p className="max-w-md mx-auto text-xs lg:text-sm text-muted-foreground">
+              <p className="text-xs lg:text-sm text-muted-foreground max-w-md mx-auto">
                 Your developer clipboard manager & browser data inspector.
                 Capture clipboard content, manage snippets, and inspect browser
                 storage — all in one place.
               </p>
-              <div className="flex flex-wrap justify-center gap-2 mt-4 lg:mt-6">
+              <div className="mt-4 lg:mt-6 flex flex-wrap justify-center gap-2">
                 <Button onClick={clipboard.readClipboard} className="gap-2">
-                  <Clipboard className="w-4 h-4" /> Read Clipboard
+                  <Clipboard className="h-4 w-4" /> Read Clipboard
                 </Button>
                 <Button
                   variant="outline"
@@ -495,7 +495,7 @@ const Index = () => {
                   }}
                   className="gap-2"
                 >
-                  <Code2 className="w-4 h-4" /> Manage Snippets
+                  <Code2 className="h-4 w-4" /> Manage Snippets
                 </Button>
                 <Button
                   variant="outline"
@@ -505,17 +505,17 @@ const Index = () => {
                   }}
                   className="gap-2"
                 >
-                  <Database className="w-4 h-4" /> Inspect Storage
+                  <Database className="h-4 w-4" /> Inspect Storage
                 </Button>
               </div>
             </div>
 
             {clipboard.currentClipboard && (
-              <div className="p-4 border rounded-xl bg-card lg:p-5 animate-fade-in">
-                <h3 className="mb-2 text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+              <div className="rounded-xl border bg-card p-4 lg:p-5 animate-fade-in">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Current Clipboard
                 </h3>
-                <pre className="p-3 overflow-y-auto font-mono text-xs break-all whitespace-pre-wrap rounded-lg bg-muted lg:p-4 lg:text-sm text-foreground/80 max-h-64">
+                <pre className="rounded-lg bg-muted p-3 lg:p-4 font-mono text-xs lg:text-sm whitespace-pre-wrap break-all text-foreground/80 max-h-64 overflow-y-auto">
                   {clipboard.currentClipboard}
                 </pre>
               </div>
@@ -543,10 +543,10 @@ const Index = () => {
               ].map((stat) => (
                 <div
                   key={stat.label}
-                  className="p-3 text-center border rounded-lg bg-card lg:p-4"
+                  className="rounded-lg border bg-card p-3 lg:p-4 text-center"
                 >
                   <stat.icon className="mx-auto mb-1.5 lg:mb-2 h-4 lg:h-5 w-4 lg:w-5 text-primary" />
-                  <p className="text-xl font-bold lg:text-2xl">{stat.value}</p>
+                  <p className="text-xl lg:text-2xl font-bold">{stat.value}</p>
                   <p className="text-[10px] lg:text-xs text-muted-foreground">
                     {stat.label}
                   </p>
@@ -554,19 +554,19 @@ const Index = () => {
               ))}
             </div>
 
-            <div className="p-3 text-center border rounded-lg border-primary/20 bg-primary/5">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-center">
               <div className="flex items-center justify-center gap-2 mb-1">
-                <Shield className="w-4 h-4 text-primary" />
+                <Shield className="h-4 w-4 text-primary" />
                 <span className="text-xs font-semibold text-primary">
-                  {workspaceCapabilities.source === "db+redis" ?
-                    "Cloud + Redis Sync"
-                  : "Local Storage Mode"}
+                  {workspaceCapabilities.source === "db+redis"
+                    ? "Cloud + Redis Sync"
+                    : "Local Storage Mode"}
                 </span>
               </div>
               <p className="text-[10px] lg:text-xs text-muted-foreground">
-                {workspaceCapabilities.source === "db+redis" ?
-                  "Paid workspace is optimized with DB storage and Redis cache."
-                : "Free workspace uses localStorage with preview-first mode."}
+                {workspaceCapabilities.source === "db+redis"
+                  ? "Paid workspace is optimized with DB storage and Redis cache."
+                  : "Free workspace uses localStorage with preview-first mode."}
                 {workspaceCapabilities.canUseTeams && (
                   <> Team members: {teamCount}</>
                 )}
@@ -576,7 +576,7 @@ const Index = () => {
         </main>
 
         {rightOpen && (
-          <aside className="overflow-hidden border-l w-72 lg:w-80 shrink-0 animate-slide-in-right">
+          <aside className="w-72 lg:w-80 shrink-0 border-l animate-slide-in-right overflow-hidden">
             <InspectorPanel
               localStorageItems={browserData.localStorageItems}
               sessionStorageItems={browserData.sessionStorageItems}

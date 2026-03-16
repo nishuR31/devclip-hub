@@ -29,8 +29,8 @@ export const PLAN_LIMITS: Record<
   PlanTier,
   { clipboard: number; snippets: number }
 > = {
-  FREE: { clipboard: 50, snippets: 10 },
-  STARTER: { clipboard: 500, snippets: -1 },
-  PRO: { clipboard: 2000, snippets: -1 },
-  TEAM: { clipboard: -1, snippets: -1 },
+  FREE: { clipboard: 25, snippets: 25 },
+  STARTER: { clipboard: 100, snippets: 200 },
+  PRO: { clipboard: 250, snippets: 500 },
+  TEAM: { clipboard: 500, snippets: 1000 },
 };
