@@ -220,6 +220,9 @@ npx prisma generate  # Generate Prisma client
 
 ```bash
 npm run build
+# Output: dist/ (frontend only, for Vercel/static deployment)
+
+npm run build:full
 # Output: dist/ (frontend) + server/dist/ (backend)
 ```
 
@@ -229,7 +232,8 @@ Start the production server:
 NODE_ENV=production node server/dist/index.js
 ```
 
-Serve the frontend `dist/` directory via a reverse proxy (nginx, Caddy) or a static host, routing all requests to `index.html` for client-side routing.
+Serve the frontend `dist/` directory via a static host, routing all requests to `index.html` for client-side routing.
+For Vercel deployments, set `VITE_API_BASE_URL` to your separately deployed backend origin.
 
 **Production checklist**
 

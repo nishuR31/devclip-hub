@@ -1,4 +1,12 @@
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(
+  /\/$/,
+  "",
+);
 
+function toApiUrl(url: string): string {
+  if (/^https?:\/\//.test(url)) return url;
+  return `${API_BASE_URL}${url}`;
+}
 
 let _accessToken: string | null = null;
 
@@ -18,7 +26,7 @@ interface FetchOptions extends RequestInit {
 
 async function refreshAccessToken(): Promise<string | null> {
   try {
-    const res = await fetch("/api/auth/refresh", {
+    const res = await fetch(toApiUrl("/api/auth/refresh"), {
       method: "POST",
       credentials: "include",
     });
@@ -47,7 +55,7 @@ export async function apiFetch<T = unknown>(
     ...(extraHeaders as Record<string, string>),
   });
 
-  let res = await fetch(url, {
+  let res = await fetch(toApiUrl(url), {
     ...rest,
     credentials: "include",
     headers: buildHeaders(_accessToken),
@@ -57,7 +65,7 @@ export async function apiFetch<T = unknown>(
   if (res.status === 401 && !skipAuth) {
     const newToken = await refreshAccessToken();
     if (newToken) {
-      res = await fetch(url, {
+      res = await fetch(toApiUrl(url), {
         ...rest,
         credentials: "include",
         headers: buildHeaders(newToken),
