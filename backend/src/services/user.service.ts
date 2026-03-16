@@ -1,16 +1,13 @@
 import bcrypt from "bcrypt";
-import { prisma } from "../lib/prisma";
 import { AppError, SafeUser } from "../types";
 import { config } from "../config/env";
 import { rzp } from "../config/razorpay";
+import { userRepository } from "../repositories/user.repository";
 
 export async function getProfile(
   userId: string,
 ): Promise<SafeUser & { subscription: any }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { subscription: true },
-  });
+  const user = await userRepository.findUserByIdWithSubscription(userId);
   if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
 
   return {
@@ -39,15 +36,11 @@ export async function updateProfile(
   userId: string,
   data: { name?: string; avatarUrl?: string },
 ) {
-  return prisma.user.update({
-    where: { id: userId },
-    data,
-    select: { id: true, name: true, avatarUrl: true, updatedAt: true },
-  });
+  return userRepository.updateUserProfile(userId, data);
 }
 
 export async function deleteAccount(userId: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await userRepository.findUserById(userId);
   if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
 
   // If user has a password, verify it
@@ -58,15 +51,18 @@ export async function deleteAccount(userId: string, password: string) {
   }
 
   // Cancel Razorpay subscription if active
-  const sub = await prisma.subscription.findUnique({ where: { userId } });
+  const sub = await userRepository.findSubscriptionByUserId(userId);
   if (sub?.rzpSubscriptionId) {
     try {
-      await (rzp.subscriptions.cancel as Function)(sub.rzpSubscriptionId, false);
+      await (rzp.subscriptions.cancel as Function)(
+        sub.rzpSubscriptionId,
+        false,
+      );
     } catch {
       // Don't block account deletion if Razorpay fails
     }
   }
 
   // Delete user (cascades to all related records)
-  await prisma.user.delete({ where: { id: userId } });
+  await userRepository.deleteUserById(userId);
 }

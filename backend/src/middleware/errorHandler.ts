@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { AppError } from "../types";
 import { Prisma } from "@prisma/client";
 import { config } from "../config/env";
+import { sendError } from "../utils/response";
 
 export function errorHandler(
   err: Error,
@@ -11,33 +12,29 @@ export function errorHandler(
 ) {
   // Known application errors
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
+    return sendError(res, err.message, err.statusCode, {
       code: err.code ?? "ERROR",
-      message: err.message,
     });
   }
 
   // Prisma unique constraint violation
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") {
-      return res.status(409).json({
+      return sendError(res, "A record with that value already exists.", 409, {
         code: "ALREADY_EXISTS",
-        message: "A record with that value already exists.",
       });
     }
     if (err.code === "P2025") {
-      return res.status(404).json({
+      return sendError(res, "Record not found.", 404, {
         code: "NOT_FOUND",
-        message: "Record not found.",
       });
     }
   }
 
   // JWT errors (caught earlier but safety net)
   if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
-    return res.status(401).json({
+    return sendError(res, "Invalid or expired token", 401, {
       code: "UNAUTHORIZED",
-      message: "Invalid or expired token",
     });
   }
 
@@ -46,5 +43,5 @@ export function errorHandler(
   const message =
     config.NODE_ENV === "development" ? err.message : "Internal server error";
 
-  return res.status(500).json({ code: "INTERNAL_ERROR", message });
+  return sendError(res, message, 500, { code: "INTERNAL_ERROR" });
 }

@@ -31,6 +31,17 @@ const envSchema = z.object({
     .min(32),
 
   // Email — Gmail SMTP with App Password
+  EMAIL_ENABLED: z
+    .string()
+    .default("true")
+    .transform((v) => v.toLowerCase() !== "false"),
+  EMAIL_SMTP_HOST: z.string().default("smtp.gmail.com"),
+  EMAIL_SMTP_PORT: z.coerce.number().default(465),
+  EMAIL_SMTP_SECURE: z
+    .string()
+    .default("true")
+    .transform((v) => v.toLowerCase() !== "false"),
+  EMAIL_SMTP_USER: z.string().optional(),
   EMAIL_FROM: z.string().default("noreply@gmail.com"),
   EMAIL_FROM_NAME: z.string().default("DevClipboard Hub"),
   EMAIL_FROM_PASS: z.string({ required_error: "EMAIL_FROM_PASS is required" }),
@@ -58,6 +69,10 @@ const envSchema = z.object({
   BCRYPT_ROUNDS: z.coerce.number().default(12),
   OTP_EXPIRES_SECONDS: z.coerce.number().default(600),
   MAGIC_LINK_EXPIRES_SECONDS: z.coerce.number().default(900),
+
+  GOOGLE_CLIENT_ID: z.string().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().default(""),
+  GOOGLE_REDIRECT_URI: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);

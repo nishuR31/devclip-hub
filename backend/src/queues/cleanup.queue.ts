@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma";
 import { config } from "../config/env";
 
 export const cleanupQueue = new Queue("cleanup", {
-  connection: bullRedis,
+  connection: bullRedis as any,
 });
 
 export async function scheduleCleanup() {
@@ -46,7 +46,7 @@ export function startCleanupWorker() {
 
       console.log("[Cleanup] Daily cleanup completed");
     },
-    { connection: bullRedis },
+    { connection: bullRedis as any },
   );
 
   return worker;

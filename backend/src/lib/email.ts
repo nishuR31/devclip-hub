@@ -2,11 +2,11 @@ import nodemailer from "nodemailer";
 import { config } from "../config/env";
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  host: config.EMAIL_SMTP_HOST,
+  port: config.EMAIL_SMTP_PORT,
+  secure: config.EMAIL_SMTP_SECURE,
   auth: {
-    user: config.EMAIL_FROM,
+    user: config.EMAIL_SMTP_USER || config.EMAIL_FROM,
     pass: config.EMAIL_FROM_PASS,
   },
 });
@@ -18,6 +18,13 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<void> {
+  if (!config.EMAIL_ENABLED) {
+    console.log(
+      `[EmailDisabled] Skipping email to ${opts.to} | subject: ${opts.subject}`,
+    );
+    return;
+  }
+
   await transporter.sendMail({
     from: `"${config.EMAIL_FROM_NAME}" <${config.EMAIL_FROM}>`,
     to: opts.to,

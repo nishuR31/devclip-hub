@@ -3,30 +3,19 @@ import { z } from "zod";
 import { authenticate } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { apiLimiter } from "../middleware/rateLimiter";
-import * as paymentService from "../services/payment.service";
+import * as paymentsController from "../controllers/payments.controller";
+import { asyncHandler } from "../utils/asyncHandler";
 
 const router = Router();
 
 router.use(authenticate, apiLimiter);
 
-// Create Razorpay subscription → returns { subscriptionId, keyId } for frontend checkout
 router.post(
   "/checkout",
   validate(z.object({ planId: z.string().min(1) })),
-  async (req, res, next) => {
-    try {
-      const result = await paymentService.createCheckoutSession(
-        req.user!.id,
-        req.body.planId,
-      );
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(paymentsController.createCheckout),
 );
 
-// Verify Razorpay payment signature after frontend checkout completes
 router.post(
   "/verify",
   validate(
@@ -36,19 +25,7 @@ router.post(
       razorpay_signature: z.string().min(1),
     }),
   ),
-  async (req, res, next) => {
-    try {
-      const result = await paymentService.verifyPayment(
-        req.user!.id,
-        req.body.razorpay_payment_id,
-        req.body.razorpay_subscription_id,
-        req.body.razorpay_signature,
-      );
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(paymentsController.verifyPayment),
 );
 
 export default router;

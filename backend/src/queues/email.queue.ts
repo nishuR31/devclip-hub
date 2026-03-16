@@ -7,6 +7,7 @@ import {
   magicLinkEmailHtml,
   welcomeEmailHtml,
 } from "../lib/email";
+import { config } from "../config/env";
 
 export type EmailJobData =
   | { type: "verification"; to: string; name: string; otp: string }
@@ -14,8 +15,8 @@ export type EmailJobData =
   | { type: "magic_link"; to: string; name: string; magicUrl: string }
   | { type: "welcome"; to: string; name: string };
 
-export const emailQueue = new Queue<EmailJobData>("email", {
-  connection: bullRedis,
+export const emailQueue = new Queue<EmailJobData, unknown, string>("email", {
+  connection: bullRedis as any,
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: "exponential", delay: 2000 },
@@ -25,7 +26,7 @@ export const emailQueue = new Queue<EmailJobData>("email", {
 });
 
 export function startEmailWorker() {
-  const worker = new Worker<EmailJobData>(
+  const worker = new Worker<EmailJobData, unknown, string>(
     "email",
     async (job: Job<EmailJobData>) => {
       const { type } = job.data;
@@ -57,14 +58,24 @@ export function startEmailWorker() {
       }
     },
     {
-      connection: bullRedis,
+      connection: bullRedis as any,
       concurrency: 5,
     },
   );
 
   worker.on("failed", (job, err) => {
     console.error(`[EmailQueue] Job ${job?.id} failed:`, err.message);
+
+    if (config.NODE_ENV !== "production") {
+      console.warn(
+        `[EmailQueue] Non-production mode: verify SMTP creds or set EMAIL_ENABLED=false for local testing.`,
+      );
+    }
   });
 
   return worker;
+}
+
+export function enqueueEmail(job: EmailJobData) {
+  return emailQueue.add("send" as any, job as any);
 }

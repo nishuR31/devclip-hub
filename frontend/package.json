@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx update-browserslist-db@latest && vite",
+    "dev": "vite",
+    "browserslist:update": "npx update-browserslist-db@latest",
     "build": "tsc -b && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

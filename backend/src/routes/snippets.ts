@@ -3,23 +3,14 @@ import { z } from "zod";
 import { authenticate } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { apiLimiter } from "../middleware/rateLimiter";
-import * as workspaceService from "../services/workspace.service";
-import type { PlanTier } from "../config/razorpay";
+import * as workspaceController from "../controllers/workspace.controller";
+import { asyncHandler } from "../utils/asyncHandler";
 
 const router = Router();
 
 router.use(authenticate, apiLimiter);
 
-router.get("/", async (req, res, next) => {
-  try {
-    const plan = (req.user!.plan ?? "FREE") as PlanTier;
-    const limit = Number(req.query.limit ?? 200);
-    const data = await workspaceService.listSnippets(req.user!.id, plan, limit);
-    res.json(data);
-  } catch (err) {
-    next(err);
-  }
-});
+router.get("/", asyncHandler(workspaceController.listSnippets));
 
 router.post(
   "/",
@@ -32,26 +23,7 @@ router.post(
       sharedWithTeam: z.boolean().optional(),
     }),
   ),
-  async (req, res, next) => {
-    try {
-      const plan = (req.user!.plan ?? "FREE") as PlanTier;
-      if (plan === "FREE") {
-        return res
-          .status(403)
-          .json({
-            message: "Free plan is localStorage-only for snippet editing",
-          });
-      }
-      const entry = await workspaceService.addSnippet(
-        req.user!.id,
-        plan,
-        req.body,
-      );
-      res.status(201).json(entry);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(workspaceController.addSnippet),
 );
 
 router.put(
@@ -65,41 +37,9 @@ router.put(
       sharedWithTeam: z.boolean().optional(),
     }),
   ),
-  async (req, res, next) => {
-    try {
-      const plan = (req.user!.plan ?? "FREE") as PlanTier;
-      if (plan === "FREE") {
-        return res
-          .status(403)
-          .json({ message: "Upgrade required to edit snippets" });
-      }
-      const entry = await workspaceService.updateSnippet(
-        req.user!.id,
-        plan,
-        req.params.id,
-        req.body,
-      );
-      if (!entry) return res.status(404).json({ message: "Snippet not found" });
-      res.json(entry);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(workspaceController.updateSnippet),
 );
 
-router.delete("/:id", async (req, res, next) => {
-  try {
-    const plan = (req.user!.plan ?? "FREE") as PlanTier;
-    if (plan === "FREE") {
-      return res
-        .status(403)
-        .json({ message: "Upgrade required to delete snippets" });
-    }
-    await workspaceService.deleteSnippet(req.user!.id, plan, req.params.id);
-    res.status(204).send();
-  } catch (err) {
-    next(err);
-  }
-});
+router.delete("/:id", asyncHandler(workspaceController.deleteSnippet));
 
 export default router;

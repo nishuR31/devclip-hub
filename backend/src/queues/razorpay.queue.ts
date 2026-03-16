@@ -6,15 +6,26 @@ export interface RazorpayEventJobData {
   event: any;
 }
 
-export const razorpayQueue = new Queue<RazorpayEventJobData>("razorpay-events", {
-  connection: bullRedis,
-  defaultJobOptions: {
-    attempts: 5,
-    backoff: { type: "exponential", delay: 3000 },
-    removeOnComplete: 50,
-    removeOnFail: 100,
+export const razorpayQueue = new Queue<RazorpayEventJobData>(
+  "razorpay-events",
+  {
+    connection: bullRedis as any,
+    defaultJobOptions: {
+      attempts: 5,
+      backoff: { type: "exponential", delay: 3000 },
+      removeOnComplete: 50,
+      removeOnFail: 100,
+    },
   },
-});
+);
+
+export function enqueueRazorpayEvent(event: any) {
+  return razorpayQueue.add("webhook" as any, { event } as any, {
+    jobId: `${event?.event ?? "unknown"}-${Date.now()}`,
+    removeOnComplete: 100,
+    removeOnFail: 50,
+  });
+}
 
 export function startRazorpayWorker() {
   const worker = new Worker<RazorpayEventJobData>(
@@ -23,7 +34,7 @@ export function startRazorpayWorker() {
       await handleWebhookEvent(job.data.event);
     },
     {
-      connection: bullRedis,
+      connection: bullRedis as any,
       concurrency: 1, // one at a time to avoid race conditions
     },
   );

@@ -18,5 +18,11 @@ export interface PublicPlan {
 }
 
 export async function fetchPublicPlans(): Promise<PublicPlan[]> {
-  return api.get<PublicPlan[]>("/api/subscriptions/plans", { skipAuth: true });
+  const res = await api.get<{ data: PublicPlan[] }>(
+    "/api/subscriptions/plans",
+    {
+      skipAuth: true,
+    },
+  );
+  return res.data ?? [];
 }

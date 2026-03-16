@@ -1,5 +1,4 @@
 import bcrypt from "bcrypt";
-import { prisma } from "../lib/prisma";
 import {
   signAccessToken,
   signRefreshToken,
@@ -25,9 +24,10 @@ import {
   generateBackupCodes,
 } from "../lib/totp";
 import { encryptText, decryptText } from "../lib/crypto";
-import { emailQueue } from "../queues/email.queue";
+import { enqueueEmail } from "../queues/email.queue";
 import { AppError, SafeUser } from "../types";
 import { config } from "../config/env";
+import { authRepository } from "../repositories/auth.repository";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -55,15 +55,13 @@ async function issueTokens(
   const refreshToken = signRefreshToken({ sub: userId, family });
   const tokenHash = hashToken(refreshToken);
 
-  await prisma.refreshToken.create({
-    data: {
-      userId,
-      tokenHash,
-      family,
-      userAgent: userAgent ?? null,
-      ip: ip ?? null,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
+  await authRepository.createRefreshToken({
+    userId,
+    tokenHash,
+    family,
+    userAgent: userAgent ?? null,
+    ip: ip ?? null,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
   const accessToken = signAccessToken({ sub: userId, email, plan });
@@ -71,11 +69,97 @@ async function issueTokens(
 }
 
 async function getUserPlan(userId: string): Promise<string> {
-  const sub = await prisma.subscription.findUnique({
-    where: { userId },
-    select: { plan: true },
-  });
+  const sub = await authRepository.findUserPlan(userId);
   return sub?.plan ?? "FREE";
+}
+
+function ensureGoogleOauthConfigured() {
+  if (
+    !config.GOOGLE_CLIENT_ID ||
+    !config.GOOGLE_CLIENT_SECRET ||
+    !config.GOOGLE_REDIRECT_URI
+  ) {
+    throw new AppError(
+      "Google OAuth is not configured on backend",
+      501,
+      "OAUTH_NOT_CONFIGURED",
+    );
+  }
+}
+
+export function getGoogleOAuthUrl() {
+  ensureGoogleOauthConfigured();
+
+  const params = new URLSearchParams({
+    client_id: config.GOOGLE_CLIENT_ID,
+    redirect_uri: config.GOOGLE_REDIRECT_URI,
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    prompt: "consent",
+  });
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+async function exchangeGoogleCode(code: string) {
+  ensureGoogleOauthConfigured();
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: config.GOOGLE_CLIENT_ID,
+      client_secret: config.GOOGLE_CLIENT_SECRET,
+      redirect_uri: config.GOOGLE_REDIRECT_URI,
+      grant_type: "authorization_code",
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    throw new AppError("Failed to exchange Google code", 401, "OAUTH_FAILED");
+  }
+
+  const tokenData = (await tokenRes.json()) as {
+    access_token?: string;
+    id_token?: string;
+  };
+
+  if (!tokenData.access_token) {
+    throw new AppError("Google access token missing", 401, "OAUTH_FAILED");
+  }
+
+  const meRes = await fetch(
+    "https://openidconnect.googleapis.com/v1/userinfo",
+    {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    },
+  );
+
+  if (!meRes.ok) {
+    throw new AppError("Failed to fetch Google profile", 401, "OAUTH_FAILED");
+  }
+
+  const me = (await meRes.json()) as {
+    email?: string;
+    name?: string;
+    email_verified?: boolean;
+  };
+
+  if (!me.email) {
+    throw new AppError(
+      "Google account email not available",
+      400,
+      "OAUTH_FAILED",
+    );
+  }
+
+  return {
+    email: me.email.toLowerCase().trim(),
+    name: me.name?.trim() || me.email,
+    emailVerified: Boolean(me.email_verified),
+  };
 }
 
 // ── Register ───────────────────────────────────────────────────────────────────
@@ -87,31 +171,32 @@ export async function register(
   userAgent?: string,
   ip?: string,
 ) {
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await authRepository.findUserByEmail(email);
   if (existing) throw new AppError("Email already in use", 409, "EMAIL_IN_USE");
 
   const passwordHash = await bcrypt.hash(password, config.BCRYPT_ROUNDS);
 
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash,
-      subscription: { create: { plan: "FREE" } },
-    },
+  const user = await authRepository.createUserWithFreePlan({
+    name,
+    email,
+    passwordHash,
   });
 
   // Generate and store OTP
   const otp = await storeEmailOTP(user.id);
 
   // Queue verification + welcome emails
-  await emailQueue.add("verification", {
+  await enqueueEmail({
     type: "verification",
     to: email,
     name: name || email,
     otp,
   });
-  await emailQueue.add("welcome", { type: "welcome", to: email, name: name || email });
+  await enqueueEmail({
+    type: "welcome",
+    to: email,
+    name: name || email,
+  });
 
   return { message: "Verification email sent", userId: user.id };
 }
@@ -124,7 +209,7 @@ export async function verifyEmail(
   userAgent?: string,
   ip?: string,
 ) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await authRepository.findUserByEmail(email);
   if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
   if (user.emailVerified)
     throw new AppError("Email already verified", 400, "ALREADY_VERIFIED");
@@ -132,10 +217,7 @@ export async function verifyEmail(
   const valid = await verifyEmailOTP(user.id, submittedOtp);
   if (!valid) throw new AppError("Invalid or expired OTP", 400, "INVALID_OTP");
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { emailVerified: true },
-  });
+  await authRepository.updateUser(user.id, { emailVerified: true });
 
   const plan = await getUserPlan(user.id);
   const tokens = await issueTokens(user.id, email, plan, userAgent, ip);
@@ -145,7 +227,7 @@ export async function verifyEmail(
 // ── Resend Verification OTP ────────────────────────────────────────────────────
 
 export async function resendVerification(email: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await authRepository.findUserByEmail(email);
   if (!user) return; // Silent — don't leak user existence
   if (user.emailVerified) return;
 
@@ -160,7 +242,7 @@ export async function resendVerification(email: string) {
   }
 
   const otp = await storeEmailOTP(user.id);
-  await emailQueue.add("verification", {
+  await enqueueEmail({
     type: "verification",
     to: email,
     name: user.name || email,
@@ -176,7 +258,7 @@ export async function login(
   userAgent?: string,
   ip?: string,
 ) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await authRepository.findUserByEmail(email);
   if (!user || !user.passwordHash) {
     throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
   }
@@ -201,9 +283,51 @@ export async function login(
   }
 
   const plan = await getUserPlan(user.id);
-  const {accessToken,refreshToken} = await issueTokens(user.id, email, plan, userAgent, ip);
-  res.cookie("devClip",{})
-  return { accessToken, user: sanitizeUser(user, plan) };
+  const { accessToken, refreshToken } = await issueTokens(
+    user.id,
+    email,
+    plan,
+    userAgent,
+    ip,
+  );
+
+  return { accessToken, refreshToken, user: sanitizeUser(user, plan) };
+}
+
+export async function loginWithGoogleCode(
+  code: string,
+  userAgent?: string,
+  ip?: string,
+) {
+  const profile = await exchangeGoogleCode(code);
+
+  let user = await authRepository.findUserByEmail(profile.email);
+
+  if (!user) {
+    user = await authRepository.createUserWithFreePlan({
+      email: profile.email,
+      name: profile.name,
+      emailVerified: profile.emailVerified,
+    });
+    await enqueueEmail({
+      type: "welcome",
+      to: profile.email,
+      name: profile.name,
+    });
+  } else if (!user.emailVerified && profile.emailVerified) {
+    user = await authRepository.updateUser(user.id, { emailVerified: true });
+  }
+
+  const plan = await getUserPlan(user.id);
+  const { accessToken, refreshToken } = await issueTokens(
+    user.id,
+    user.email,
+    plan,
+    userAgent,
+    ip,
+  );
+
+  return { accessToken, refreshToken, user: sanitizeUser(user, plan) };
 }
 
 // ── 2FA TOTP Verify ───────────────────────────────────────────────────────────
@@ -225,7 +349,7 @@ export async function verifyTwoFactor(
     );
   }
 
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+  const user = await authRepository.findUserById(payload.sub);
   if (!user || !user.twoFactorSecret)
     throw new AppError("2FA not configured", 400, "2FA_NOT_CONFIGURED");
 
@@ -243,10 +367,7 @@ export async function verifyTwoFactor(
 export async function logout(refreshTokenRaw: string) {
   if (!refreshTokenRaw) return;
   const tokenHash = hashToken(refreshTokenRaw);
-  await prisma.refreshToken.updateMany({
-    where: { tokenHash },
-    data: { revokedAt: new Date() },
-  });
+  await authRepository.revokeRefreshTokensByHash(tokenHash);
 }
 
 // ── Refresh Tokens ─────────────────────────────────────────────────────────────
@@ -264,7 +385,7 @@ export async function refreshTokens(
   }
 
   const tokenHash = hashToken(refreshTokenRaw);
-  const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
+  const stored = await authRepository.findRefreshTokenByHash(tokenHash);
 
   if (!stored) {
     throw new AppError("Refresh token not found", 401, "INVALID_REFRESH_TOKEN");
@@ -272,10 +393,7 @@ export async function refreshTokens(
 
   // Reuse detection: if token is revoked, revoke entire family
   if (stored.revokedAt) {
-    await prisma.refreshToken.updateMany({
-      where: { userId: stored.userId, family: stored.family },
-      data: { revokedAt: new Date() },
-    });
+    await authRepository.revokeRefreshTokenFamily(stored.userId, stored.family);
     throw new AppError(
       "Refresh token reuse detected. Please login again.",
       401,
@@ -284,13 +402,10 @@ export async function refreshTokens(
   }
 
   // Revoke old token
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date() },
-  });
+  await authRepository.revokeRefreshTokenById(stored.id);
 
   // Issue new pair
-  const user = await prisma.user.findUnique({ where: { id: stored.userId } });
+  const user = await authRepository.findUserById(stored.userId);
   if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
 
   const plan = await getUserPlan(user.id);
@@ -300,15 +415,13 @@ export async function refreshTokens(
   });
   const newTokenHash = hashToken(newRefreshToken);
 
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      tokenHash: newTokenHash,
-      family: stored.family,
-      userAgent: userAgent ?? null,
-      ip: ip ?? null,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
+  await authRepository.createRefreshToken({
+    userId: user.id,
+    tokenHash: newTokenHash,
+    family: stored.family,
+    userAgent: userAgent ?? null,
+    ip: ip ?? null,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
   const accessToken = signAccessToken({
@@ -326,7 +439,7 @@ export async function refreshTokens(
 // ── 2FA Setup ──────────────────────────────────────────────────────────────────
 
 export async function setupTwoFactor(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await authRepository.findUserById(userId);
   if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
   if (user.twoFactorEnabled)
     throw new AppError("2FA is already enabled", 400, "ALREADY_ENABLED");
@@ -338,10 +451,7 @@ export async function setupTwoFactor(userId: string) {
   const backupCodes = generateBackupCodes();
 
   // Store pending secret (not yet enabled — user must confirm a code)
-  await prisma.user.update({
-    where: { id: userId },
-    data: { twoFactorSecret: encryptedSecret },
-  });
+  await authRepository.updateUser(userId, { twoFactorSecret: encryptedSecret });
 
   return { secret, qrCodeDataUrl, backupCodes };
 }
@@ -349,7 +459,7 @@ export async function setupTwoFactor(userId: string) {
 // ── 2FA Enable ─────────────────────────────────────────────────────────────────
 
 export async function enableTwoFactor(userId: string, totpCode: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await authRepository.findUserById(userId);
   if (!user || !user.twoFactorSecret)
     throw new AppError("Run 2FA setup first", 400, "SETUP_REQUIRED");
   if (user.twoFactorEnabled)
@@ -364,9 +474,9 @@ export async function enableTwoFactor(userId: string, totpCode: string) {
     backupCodes.map((c) => bcrypt.hash(c, 10)),
   );
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { twoFactorEnabled: true, backupCodes: hashedCodes },
+  await authRepository.updateUser(userId, {
+    twoFactorEnabled: true,
+    backupCodes: hashedCodes,
   });
 
   return { backupCodes }; // Raw codes shown once
@@ -375,7 +485,7 @@ export async function enableTwoFactor(userId: string, totpCode: string) {
 // ── 2FA Disable ────────────────────────────────────────────────────────────────
 
 export async function disableTwoFactor(userId: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await authRepository.findUserById(userId);
   if (!user || !user.passwordHash)
     throw new AppError("User not found", 404, "NOT_FOUND");
 
@@ -383,36 +493,30 @@ export async function disableTwoFactor(userId: string, password: string) {
   if (!valid)
     throw new AppError("Invalid password", 401, "INVALID_CREDENTIALS");
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      twoFactorEnabled: false,
-      twoFactorSecret: null,
-      backupCodes: [],
-    },
+  await authRepository.updateUser(userId, {
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
+    backupCodes: [],
   });
 }
 
 // ── Magic Link ─────────────────────────────────────────────────────────────────
 
 export async function sendMagicLink(email: string) {
-  let user = await prisma.user.findUnique({ where: { email } });
+  let user = await authRepository.findUserByEmail(email);
 
   // Auto-create user if not exists (passwordless signup)
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email,
-        emailVerified: true, // Magic link = email verified by definition
-        subscription: { create: { plan: "FREE" } },
-      },
+    user = await authRepository.createUserWithFreePlan({
+      email,
+      emailVerified: true,
     });
-    await emailQueue.add("welcome", { type: "welcome", to: email, name: email });
+    await enqueueEmail({ type: "welcome", to: email, name: email });
   }
 
   const token = await storeMagicToken(user.id);
   const magicUrl = `${config.FRONTEND_URL}/auth/magic?token=${token}`;
-  await emailQueue.add("magic_link", {
+  await enqueueEmail({
     type: "magic_link",
     to: email,
     name: user.name || email,
@@ -433,15 +537,12 @@ export async function verifyMagicLink(
       "INVALID_TOKEN",
     );
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await authRepository.findUserById(userId);
   if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
 
   // Mark email verified if not already
   if (!user.emailVerified) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { emailVerified: true },
-    });
+    await authRepository.updateUser(userId, { emailVerified: true });
   }
 
   const plan = await getUserPlan(userId);
@@ -455,11 +556,11 @@ export async function verifyMagicLink(
 // ── Forgot Password ────────────────────────────────────────────────────────────
 
 export async function sendPasswordReset(email: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await authRepository.findUserByEmail(email);
   if (!user) return; // Silently ignore to not leak user existence
 
   const otp = await storePasswordResetOTP(user.id);
-  await emailQueue.add("password_reset", {
+  await enqueueEmail({
     type: "password_reset",
     to: email,
     name: user.name || email,
@@ -472,7 +573,7 @@ export async function resetPassword(
   otp: string,
   newPassword: string,
 ) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await authRepository.findUserByEmail(email);
   if (!user) throw new AppError("User not found", 404, "NOT_FOUND");
 
   const valid = await verifyPasswordResetOTP(user.id, otp);
@@ -482,11 +583,8 @@ export async function resetPassword(
 
   // Update password and revoke ALL refresh tokens
   await Promise.all([
-    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
-    prisma.refreshToken.updateMany({
-      where: { userId: user.id, revokedAt: null },
-      data: { revokedAt: new Date() },
-    }),
+    authRepository.updateUser(user.id, { passwordHash }),
+    authRepository.revokeActiveRefreshTokensByUser(user.id),
   ]);
 }
 
@@ -498,7 +596,7 @@ export async function changePassword(
   newPassword: string,
   currentRefreshToken?: string,
 ) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await authRepository.findUserById(userId);
   if (!user || !user.passwordHash)
     throw new AppError("User not found", 404, "NOT_FOUND");
 
@@ -511,18 +609,11 @@ export async function changePassword(
     );
 
   const passwordHash = await bcrypt.hash(newPassword, config.BCRYPT_ROUNDS);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  await authRepository.updateUser(userId, { passwordHash });
 
   // Revoke all OTHER refresh tokens (keep current session)
   if (currentRefreshToken) {
     const currentHash = hashToken(currentRefreshToken);
-    await prisma.refreshToken.updateMany({
-      where: {
-        userId,
-        revokedAt: null,
-        tokenHash: { not: currentHash },
-      },
-      data: { revokedAt: new Date() },
-    });
+    await authRepository.revokeOtherActiveRefreshTokens(userId, currentHash);
   }
 }

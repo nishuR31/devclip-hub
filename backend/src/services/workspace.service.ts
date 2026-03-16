@@ -1,7 +1,5 @@
-import { randomUUID } from "crypto";
-import { prisma } from "../lib/prisma";
-import { redis } from "../config/redis";
 import type { PlanTier } from "../config/razorpay";
+import { workspaceRepository } from "../repositories/workspace.repository";
 
 export interface ClipboardEntry {
   id: string;
@@ -43,61 +41,6 @@ const PLAN_LIMITS: Record<PlanTier, { clipboard: number; snippets: number }> = {
   TEAM: { clipboard: 500, snippets: 1000 },
 };
 
-function collectionFor(kind: "clipboard" | "snippets") {
-  return kind === "clipboard" ? "workspace_clipboard" : "workspace_snippets";
-}
-
-function cacheKey(
-  kind: "clipboard" | "snippets",
-  userId: string,
-  limit: number,
-) {
-  return `ws:${kind}:${userId}:${limit}`;
-}
-
-function parseFirstBatch<T>(result: unknown): T[] {
-  const value = result as { cursor?: { firstBatch?: T[] } };
-  return value?.cursor?.firstBatch ?? [];
-}
-
-function detectType(content: string): ClipboardEntry["type"] {
-  try {
-    JSON.parse(content);
-    return "json";
-  } catch {
-    // no-op
-  }
-  if (/^https?:\/\//i.test(content.trim())) return "url";
-  if (/[{}<>();[\]=>]/.test(content) && content.includes("\n")) return "code";
-  return "text";
-}
-
-async function getCache<T>(key: string): Promise<T | null> {
-  try {
-    const raw = await redis.get(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function setCache<T>(key: string, value: T): Promise<void> {
-  try {
-    await redis.set(key, JSON.stringify(value), "EX", 60);
-  } catch {
-    // cache is optional
-  }
-}
-
-async function clearKindCache(kind: "clipboard" | "snippets", userId: string) {
-  try {
-    const keys = await redis.keys(`ws:${kind}:${userId}:*`);
-    if (keys.length) await redis.del(keys);
-  } catch {
-    // cache is optional
-  }
-}
-
 export function getCapabilities(plan: PlanTier): WorkspaceCapabilities {
   const isPaid = plan !== "FREE";
   return {
@@ -116,23 +59,7 @@ export async function listClipboard(
   plan: PlanTier,
   limit: number,
 ): Promise<ClipboardEntry[]> {
-  if (plan === "FREE") return [];
-
-  const capped = Math.min(limit, PLAN_LIMITS[plan].clipboard);
-  const key = cacheKey("clipboard", userId, capped);
-  const cached = await getCache<ClipboardEntry[]>(key);
-  if (cached) return cached;
-
-  const result = await prisma.$runCommandRaw({
-    find: collectionFor("clipboard"),
-    filter: { userId },
-    sort: { createdAt: -1 },
-    limit: capped,
-  });
-
-  const entries = parseFirstBatch<ClipboardEntry>(result);
-  await setCache(key, entries);
-  return entries;
+  return workspaceRepository.listClipboard(userId, plan, limit);
 }
 
 export async function addClipboard(
@@ -140,27 +67,7 @@ export async function addClipboard(
   plan: PlanTier,
   input: { content: string; tags?: string[]; pinned?: boolean },
 ): Promise<ClipboardEntry> {
-  const now = new Date().toISOString();
-  const doc: ClipboardEntry = {
-    id: randomUUID(),
-    userId,
-    content: input.content,
-    type: detectType(input.content),
-    pinned: Boolean(input.pinned),
-    tags: input.tags ?? [],
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  if (plan !== "FREE") {
-    await prisma.$runCommandRaw({
-      insert: collectionFor("clipboard"),
-      documents: [doc as unknown as Record<string, unknown>],
-    } as never);
-    await clearKindCache("clipboard", userId);
-  }
-
-  return doc;
+  return workspaceRepository.addClipboard(userId, plan, input);
 }
 
 export async function updateClipboard(
@@ -169,37 +76,7 @@ export async function updateClipboard(
   id: string,
   updates: Partial<Pick<ClipboardEntry, "content" | "pinned" | "tags">>,
 ): Promise<ClipboardEntry | null> {
-  if (plan === "FREE") return null;
-
-  const patch: Record<string, unknown> = {
-    updatedAt: new Date().toISOString(),
-  };
-  if (typeof updates.content === "string") {
-    patch.content = updates.content;
-    patch.type = detectType(updates.content);
-  }
-  if (typeof updates.pinned === "boolean") patch.pinned = updates.pinned;
-  if (Array.isArray(updates.tags)) patch.tags = updates.tags;
-
-  await prisma.$runCommandRaw({
-    update: collectionFor("clipboard"),
-    updates: [
-      {
-        q: { id, userId },
-        u: { $set: patch as Record<string, unknown> },
-        multi: false,
-      },
-    ],
-  } as never);
-
-  const result = await prisma.$runCommandRaw({
-    find: collectionFor("clipboard"),
-    filter: { id, userId },
-    limit: 1,
-  });
-
-  await clearKindCache("clipboard", userId);
-  return parseFirstBatch<ClipboardEntry>(result)[0] ?? null;
+  return workspaceRepository.updateClipboard(userId, plan, id, updates);
 }
 
 export async function deleteClipboard(
@@ -207,24 +84,14 @@ export async function deleteClipboard(
   plan: PlanTier,
   id: string,
 ): Promise<void> {
-  if (plan === "FREE") return;
-  await prisma.$runCommandRaw({
-    delete: collectionFor("clipboard"),
-    deletes: [{ q: { id, userId }, limit: 1 }],
-  });
-  await clearKindCache("clipboard", userId);
+  return workspaceRepository.deleteClipboard(userId, plan, id);
 }
 
 export async function clearUnpinnedClipboard(
   userId: string,
   plan: PlanTier,
 ): Promise<void> {
-  if (plan === "FREE") return;
-  await prisma.$runCommandRaw({
-    delete: collectionFor("clipboard"),
-    deletes: [{ q: { userId, pinned: false }, limit: 0 }],
-  });
-  await clearKindCache("clipboard", userId);
+  return workspaceRepository.clearUnpinnedClipboard(userId, plan);
 }
 
 export async function listSnippets(
@@ -232,23 +99,7 @@ export async function listSnippets(
   plan: PlanTier,
   limit: number,
 ): Promise<SnippetEntry[]> {
-  if (plan === "FREE") return [];
-
-  const capped = Math.min(limit, PLAN_LIMITS[plan].snippets);
-  const key = cacheKey("snippets", userId, capped);
-  const cached = await getCache<SnippetEntry[]>(key);
-  if (cached) return cached;
-
-  const result = await prisma.$runCommandRaw({
-    find: collectionFor("snippets"),
-    filter: { userId },
-    sort: { createdAt: -1 },
-    limit: capped,
-  });
-
-  const entries = parseFirstBatch<SnippetEntry>(result);
-  await setCache(key, entries);
-  return entries;
+  return workspaceRepository.listSnippets(userId, plan, limit);
 }
 
 export async function addSnippet(
@@ -262,28 +113,7 @@ export async function addSnippet(
     sharedWithTeam?: boolean;
   },
 ): Promise<SnippetEntry> {
-  const now = new Date().toISOString();
-  const doc: SnippetEntry = {
-    id: randomUUID(),
-    userId,
-    title: input.title,
-    content: input.content,
-    tags: input.tags ?? [],
-    masked: Boolean(input.masked),
-    sharedWithTeam: Boolean(input.sharedWithTeam),
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  if (plan !== "FREE") {
-    await prisma.$runCommandRaw({
-      insert: collectionFor("snippets"),
-      documents: [doc as unknown as Record<string, unknown>],
-    } as never);
-    await clearKindCache("snippets", userId);
-  }
-
-  return doc;
+  return workspaceRepository.addSnippet(userId, plan, input);
 }
 
 export async function updateSnippet(
@@ -297,38 +127,7 @@ export async function updateSnippet(
     >
   >,
 ): Promise<SnippetEntry | null> {
-  if (plan === "FREE") return null;
-
-  const patch: Record<string, unknown> = {
-    updatedAt: new Date().toISOString(),
-  };
-  if (typeof updates.title === "string") patch.title = updates.title;
-  if (typeof updates.content === "string") patch.content = updates.content;
-  if (Array.isArray(updates.tags)) patch.tags = updates.tags;
-  if (typeof updates.masked === "boolean") patch.masked = updates.masked;
-  if (typeof updates.sharedWithTeam === "boolean") {
-    patch.sharedWithTeam = updates.sharedWithTeam;
-  }
-
-  await prisma.$runCommandRaw({
-    update: collectionFor("snippets"),
-    updates: [
-      {
-        q: { id, userId },
-        u: { $set: patch as Record<string, unknown> },
-        multi: false,
-      },
-    ],
-  } as never);
-
-  const result = await prisma.$runCommandRaw({
-    find: collectionFor("snippets"),
-    filter: { id, userId },
-    limit: 1,
-  });
-
-  await clearKindCache("snippets", userId);
-  return parseFirstBatch<SnippetEntry>(result)[0] ?? null;
+  return workspaceRepository.updateSnippet(userId, plan, id, updates);
 }
 
 export async function deleteSnippet(
@@ -336,24 +135,12 @@ export async function deleteSnippet(
   plan: PlanTier,
   id: string,
 ): Promise<void> {
-  if (plan === "FREE") return;
-  await prisma.$runCommandRaw({
-    delete: collectionFor("snippets"),
-    deletes: [{ q: { id, userId }, limit: 1 }],
-  });
-  await clearKindCache("snippets", userId);
+  return workspaceRepository.deleteSnippet(userId, plan, id);
 }
 
 export async function getTeamMembers(
   userId: string,
   plan: PlanTier,
 ): Promise<string[]> {
-  if (plan !== "TEAM") return [];
-  const key = `ws:team:${userId}:members`;
-  try {
-    const members = await redis.smembers(key);
-    return members;
-  } catch {
-    return [];
-  }
+  return workspaceRepository.getTeamMembers(userId, plan);
 }

@@ -1,27 +1,26 @@
-import { prisma } from "../lib/prisma";
 import { rzp } from "../config/razorpay";
 import { AppError } from "../types";
+import { subscriptionRepository } from "../repositories/subscription.repository";
 
 export async function getForUser(userId: string) {
-  return prisma.subscription.findUnique({ where: { userId } });
+  return subscriptionRepository.findByUserId(userId);
 }
 
 export async function ensureSubscriptionExists(userId: string) {
-  const existing = await prisma.subscription.findUnique({ where: { userId } });
+  const existing = await subscriptionRepository.findByUserId(userId);
   if (existing) return existing;
-  return prisma.subscription.create({ data: { userId, plan: "FREE" } });
+  return subscriptionRepository.createFreeForUser(userId);
 }
 
 export async function cancelAtPeriodEnd(userId: string) {
-  const sub = await prisma.subscription.findUnique({ where: { userId } });
+  const sub = await subscriptionRepository.findByUserId(userId);
   if (!sub?.rzpSubscriptionId)
     throw new AppError("No active subscription", 400, "NO_SUBSCRIPTION");
 
   // cancel_at_cycle_end=true → cancels after current billing cycle
   await (rzp.subscriptions.cancel as Function)(sub.rzpSubscriptionId, true);
-  await prisma.subscription.update({
-    where: { userId },
-    data: { cancelAtPeriodEnd: true },
+  return subscriptionRepository.updateByUserId(userId, {
+    cancelAtPeriodEnd: true,
   });
 }
 
@@ -47,18 +46,15 @@ export async function updateFromRzp(
     cancelAtPeriodEnd?: boolean;
   },
 ) {
-  await prisma.subscription.updateMany({
-    where: { rzpSubscriptionId },
-    data: updates as any,
-  });
+  await subscriptionRepository.updateManyByRzpSubscriptionId(
+    rzpSubscriptionId,
+    updates as any,
+  );
 }
 
 export async function updateRzpSubscription(
   userId: string,
   rzpSubscriptionId: string,
 ) {
-  await prisma.subscription.update({
-    where: { userId },
-    data: { rzpSubscriptionId },
-  });
+  await subscriptionRepository.updateByUserId(userId, { rzpSubscriptionId });
 }

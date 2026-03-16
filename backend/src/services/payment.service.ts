@@ -1,9 +1,9 @@
 import crypto from "crypto";
 import { rzp, RZP_PLAN_TO_TIER, YEARLY_PLAN_IDS } from "../config/razorpay";
-import { prisma } from "../lib/prisma";
 import { AppError } from "../types";
 import { config } from "../config/env";
 import * as subscriptionService from "./subscription.service";
+import { subscriptionRepository } from "../repositories/subscription.repository";
 
 export async function createCheckoutSession(userId: string, planId: string) {
   await subscriptionService.ensureSubscriptionExists(userId);
@@ -33,21 +33,20 @@ export async function verifyPayment(
   if (expected !== razorpay_signature)
     throw new AppError("Invalid payment signature", 400, "INVALID_SIGNATURE");
 
-  const sub = await (rzp.subscriptions.fetch as Function)(razorpay_subscription_id);
+  const sub = await (rzp.subscriptions.fetch as Function)(
+    razorpay_subscription_id,
+  );
   const planId = sub.plan_id as string;
   const plan = RZP_PLAN_TO_TIER[planId] ?? "FREE";
   const interval = YEARLY_PLAN_IDS.has(planId) ? "YEARLY" : "MONTHLY";
 
-  await prisma.subscription.update({
-    where: { userId },
-    data: {
-      plan: plan as any,
-      status: "ACTIVE",
-      rzpSubscriptionId: razorpay_subscription_id,
-      rzpPlanId: planId,
-      billingInterval: interval as any,
-      cancelAtPeriodEnd: false,
-    },
+  await subscriptionRepository.updateByUserId(userId, {
+    plan: plan as any,
+    status: "ACTIVE",
+    rzpSubscriptionId: razorpay_subscription_id,
+    rzpPlanId: planId,
+    billingInterval: interval as any,
+    cancelAtPeriodEnd: false,
   });
 
   return { success: true };
@@ -82,11 +81,13 @@ export async function handleWebhookEvent(event: any) {
         status: statusMap[subEntity.status] ?? "ACTIVE",
         rzpPlanId: planId,
         billingInterval: interval,
-        currentPeriodStart: subEntity.current_start
-          ? new Date(subEntity.current_start * 1000)
+        currentPeriodStart:
+          subEntity.current_start ?
+            new Date(subEntity.current_start * 1000)
           : undefined,
-        currentPeriodEnd: subEntity.current_end
-          ? new Date(subEntity.current_end * 1000)
+        currentPeriodEnd:
+          subEntity.current_end ?
+            new Date(subEntity.current_end * 1000)
           : undefined,
         cancelAtPeriodEnd: false,
       });

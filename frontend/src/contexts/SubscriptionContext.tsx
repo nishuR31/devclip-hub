@@ -7,9 +7,7 @@ import React, {
 } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "./AuthContext";
-import { type PlanTier, PLAN_HIERARCHY, planAtLeast } from "@/lib/plans";
-
-// ── Types ──────────────────────────────────────────────────────────────────────
+import { type PlanTier, planAtLeast } from "@/lib/plans";
 
 export interface SubscriptionInfo {
   plan: PlanTier;
@@ -23,45 +21,36 @@ interface SubscriptionContextValue {
   subscription: SubscriptionInfo | null;
   plan: PlanTier;
   isLoading: boolean;
-  /** Returns true if user's plan is at or above the required tier */
   can: (requiredPlan: PlanTier) => boolean;
-  /** Clipboard item limit (-1 = unlimited) */
   clipboardLimit: number;
-  /** Snippet item limit (-1 = unlimited) */
   snippetLimit: number;
   refetch: () => Promise<void>;
 }
 
-// ── Limits by plan ─────────────────────────────────────────────────────────────
-
 const CLIPBOARD_LIMITS: Record<PlanTier, number> = {
-  FREE: 50,
-  STARTER: 500,
-  PRO: 2000,
-  TEAM: -1,
+  FREE: 25,
+  STARTER: 100,
+  PRO: 250,
+  TEAM: 500,
 };
 
 const SNIPPET_LIMITS: Record<PlanTier, number> = {
-  FREE: 10,
-  STARTER: -1,
-  PRO: -1,
-  TEAM: -1,
+  FREE: 25,
+  STARTER: 200,
+  PRO: 500,
+  TEAM: 1000,
 };
-
-// ── Context ────────────────────────────────────────────────────────────────────
 
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(
   null,
 );
-
-// ── Provider ───────────────────────────────────────────────────────────────────
 
 export function SubscriptionProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(
     null,
   );
@@ -72,6 +61,7 @@ export function SubscriptionProvider({
       setSubscription(null);
       return;
     }
+
     setIsLoading(true);
     try {
       const data = await api.get<SubscriptionInfo>("/api/subscriptions/me");
@@ -89,7 +79,10 @@ export function SubscriptionProvider({
     }
   }, [authLoading, fetchSubscription]);
 
-  const plan: PlanTier = (subscription?.plan as PlanTier) ?? "FREE";
+  const plan: PlanTier =
+    (subscription?.plan as PlanTier | undefined) ??
+    (user?.plan as PlanTier | undefined) ??
+    "FREE";
 
   const can = useCallback(
     (requiredPlan: PlanTier) => planAtLeast(plan, requiredPlan),
@@ -113,13 +106,12 @@ export function SubscriptionProvider({
   );
 }
 
-// ── Hook ───────────────────────────────────────────────────────────────────────
-
 export function useSubscription(): SubscriptionContextValue {
   const ctx = useContext(SubscriptionContext);
-  if (!ctx)
+  if (!ctx) {
     throw new Error(
       "useSubscription must be used inside <SubscriptionProvider>",
     );
+  }
   return ctx;
 }

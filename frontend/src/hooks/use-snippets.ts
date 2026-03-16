@@ -55,7 +55,9 @@ export function useSnippets() {
     queryKey: [...QKEY, plan],
     queryFn: () =>
       isPaid ?
-        api.get<SnippetEntry[]>(`/api/snippets?limit=${limit}`)
+        api
+          .get<{ data: SnippetEntry[] }>(`/api/snippets?limit=${limit}`)
+          .then((r) => r.data ?? [])
       : Promise.resolve(localSnippets),
     initialData: [],
   });
