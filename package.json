@@ -1,7 +1,7 @@
 {
   "name": "devclipboard-hub-workspace",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
     "dev": "concurrently -n frontend,backend -c cyan,yellow \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
     "dev:frontend": "npm --prefix frontend run dev",
