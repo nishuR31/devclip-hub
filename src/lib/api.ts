@@ -1,10 +1,4 @@
-/**
- * Typed API client.
- *
- * - Stores the access token in memory (never in localStorage).
- * - On 401, transparently calls POST /api/auth/refresh (httpOnly cookie) and retries once.
- * - All public fetch helpers re-export as named exports for easy import.
- */
+
 
 let _accessToken: string | null = null;
 

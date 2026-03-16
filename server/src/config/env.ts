@@ -46,6 +46,15 @@ const envSchema = z.object({
   RAZORPAY_TEAM_MONTHLY_PLAN_ID: z.string().default(""),
   RAZORPAY_TEAM_YEARLY_PLAN_ID: z.string().default(""),
 
+  PLAN_FREE_MONTHLY_INR_PAISE: z.coerce.number().default(0),
+  PLAN_FREE_YEARLY_INR_PAISE: z.coerce.number().default(0),
+  PLAN_STARTER_MONTHLY_INR_PAISE: z.coerce.number().default(29900),
+  PLAN_STARTER_YEARLY_INR_PAISE: z.coerce.number().default(249900),
+  PLAN_PRO_MONTHLY_INR_PAISE: z.coerce.number().default(59900),
+  PLAN_PRO_YEARLY_INR_PAISE: z.coerce.number().default(499900),
+  PLAN_TEAM_MONTHLY_INR_PAISE: z.coerce.number().default(149900),
+  PLAN_TEAM_YEARLY_INR_PAISE: z.coerce.number().default(1199900),
+
   BCRYPT_ROUNDS: z.coerce.number().default(12),
   OTP_EXPIRES_SECONDS: z.coerce.number().default(600),
   MAGIC_LINK_EXPIRES_SECONDS: z.coerce.number().default(900),

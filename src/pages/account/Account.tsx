@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { User, CreditCard, Shield, ChevronRight } from "lucide-react";
 import {
   Card,
@@ -17,6 +17,12 @@ import { type PlanTier } from "@/lib/plans";
 export default function AccountPage() {
   const { user, logout } = useAuth();
   const { plan } = useSubscription();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -24,7 +30,7 @@ export default function AccountPage() {
         <Link to="/" className="font-semibold text-lg">
           DevClipboard Hub
         </Link>
-        <Button variant="ghost" size="sm" onClick={logout}>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
           Sign out
         </Button>
       </div>
@@ -32,7 +38,9 @@ export default function AccountPage() {
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Account</h1>
-          <p className="text-muted-foreground text-sm">Manage your profile and subscription</p>
+          <p className="text-muted-foreground text-sm">
+            Manage your profile and subscription
+          </p>
         </div>
 
         {/* Profile card */}
@@ -40,7 +48,8 @@ export default function AccountPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase()}
+                {user?.name?.[0]?.toUpperCase() ??
+                  user?.email?.[0]?.toUpperCase()}
               </div>
               <div>
                 <CardTitle className="text-base">{user?.name ?? "—"}</CardTitle>
@@ -56,20 +65,30 @@ export default function AccountPage() {
         {/* Navigation links */}
         <Card>
           <CardContent className="p-0">
-            <Link to="/account/billing" className="flex items-center gap-3 px-4 py-4 hover:bg-accent transition-colors rounded-t-lg">
+            <Link
+              to="/account/billing"
+              className="flex items-center gap-3 px-4 py-4 hover:bg-accent transition-colors rounded-t-lg"
+            >
               <CreditCard className="h-5 w-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-sm font-medium">Billing & Subscription</p>
-                <p className="text-xs text-muted-foreground">Manage your plan and payment</p>
+                <p className="text-xs text-muted-foreground">
+                  Manage your plan and payment
+                </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Link>
             <Separator />
-            <Link to="/account/security" className="flex items-center gap-3 px-4 py-4 hover:bg-accent transition-colors rounded-b-lg">
+            <Link
+              to="/account/security"
+              className="flex items-center gap-3 px-4 py-4 hover:bg-accent transition-colors rounded-b-lg"
+            >
               <Shield className="h-5 w-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-sm font-medium">Security</p>
-                <p className="text-xs text-muted-foreground">Password and two-factor authentication</p>
+                <p className="text-xs text-muted-foreground">
+                  Password and two-factor authentication
+                </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Link>
@@ -77,10 +96,12 @@ export default function AccountPage() {
         </Card>
 
         <div className="flex items-center justify-between">
-          <Link to="/">
-            <Button variant="outline" size="sm">Back to app</Button>
+          <Link to="/app">
+            <Button variant="outline" size="sm">
+              Back to app
+            </Button>
           </Link>
-          <Button variant="destructive" size="sm" onClick={logout}>
+          <Button variant="destructive" size="sm" onClick={handleLogout}>
             Sign out
           </Button>
         </div>

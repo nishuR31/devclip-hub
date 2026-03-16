@@ -15,6 +15,16 @@ export default defineConfig(({ mode }) => ({
       "/api": {
         target: "http://localhost:3001",
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on("error", (_err, _req, res) => {
+            // Backend offline — return a clean 503 so the client error handler
+            // fires normally instead of logging a raw ECONNREFUSED stack.
+            if (!res.headersSent) {
+              res.writeHead(503, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ message: "Backend offline" }));
+            }
+          });
+        },
       },
     },
   },

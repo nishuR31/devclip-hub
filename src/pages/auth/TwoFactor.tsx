@@ -22,6 +22,7 @@ export default function TwoFactorPage() {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
   const twoFactorToken = (location.state as any)?.twoFactorToken ?? "";
+  const from = (location.state as any)?.from?.pathname ?? "/app";
 
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,7 +39,7 @@ export default function TwoFactorPage() {
       setAccessToken(data.accessToken);
       await refreshUser();
       toast.success("Signed in!");
-      navigate("/");
+      navigate(from, { replace: true });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Invalid code");
       setCode("");

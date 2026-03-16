@@ -29,23 +29,8 @@ export default function BillingPage() {
   const { subscription, plan, refetch } = useSubscription();
   const [cancelLoading, setCancelLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
 
   const currentPlanInfo = PLANS.find((p) => p.id === plan);
-
-  const openPortal = async () => {
-    setPortalLoading(true);
-    try {
-      const { url } = await api.post<{ url: string }>("/api/payments/portal");
-      window.location.href = url;
-    } catch (err) {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to open billing portal",
-      );
-    } finally {
-      setPortalLoading(false);
-    }
-  };
 
   const cancelSubscription = async () => {
     setCancelLoading(true);
@@ -159,16 +144,10 @@ export default function BillingPage() {
                 </Link>
               </div>
             : <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={openPortal}
-                  disabled={portalLoading}
-                >
-                  {portalLoading ?
-                    "Opening..."
-                  : "Manage billing (Stripe portal)"}
-                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Payments are processed securely via Razorpay. Your billing
+                  details are managed by Razorpay directly.
+                </p>
 
                 {subscription?.cancelAtPeriodEnd ?
                   <Button

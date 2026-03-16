@@ -39,7 +39,7 @@ export default function VerifyEmailPage() {
       setAccessToken(data.accessToken);
       await refreshUser();
       toast.success("Email verified! Welcome.");
-      navigate("/");
+      navigate("/app");
     } catch (err) {
       toast.error(
         err instanceof ApiError ? err.message : "Verification failed",

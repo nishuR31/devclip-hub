@@ -18,7 +18,7 @@ const REFRESH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: config.NODE_ENV === "production",
   sameSite: config.NODE_ENV === "production" ? "strict" : "lax",
-  path: "/api/auth/refresh",
+  path: "/api/auth",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
@@ -134,7 +134,7 @@ router.post("/logout", async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
     await authService.logout(refreshToken ?? "");
-    res.clearCookie("refreshToken", { path: "/api/auth/refresh" });
+    res.clearCookie("refreshToken", { path: "/api/auth" });
     res.json({ message: "Logged out" });
   } catch (err) {
     next(err);

@@ -29,7 +29,7 @@ app.use(
   }),
 );
 
-// ── Stripe Webhook (MUST be before express.json — needs raw body) ─────────────
+// ── Webhooks (MUST be before express.json — needs raw body) ──────────────────
 app.use(
   "/api/webhooks",
   express.raw({ type: "application/json" }),
@@ -41,6 +41,9 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+app.get("/", (req, res) => {
+  res.status(200).json({ message: "Running" });
+});
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);

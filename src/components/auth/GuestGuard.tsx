@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface GuestGuardProps {
   children: React.ReactNode;
-  /** Redirect destination when authenticated (default: /) */
+  /** Redirect destination when authenticated (default: /app) */
   redirectTo?: string;
 }
 
@@ -11,7 +11,7 @@ interface GuestGuardProps {
  * Wraps guest-only routes (login, register, etc.).
  * Redirects to the app home if the user is already signed in.
  */
-export function GuestGuard({ children, redirectTo = "/" }: GuestGuardProps) {
+export function GuestGuard({ children, redirectTo = "/app" }: GuestGuardProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {

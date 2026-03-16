@@ -7,8 +7,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:generate": "npx prisma generate",
+    "prisma:push": "npx prisma db push",
+    "prisma":"npm run prisma:generate && npm run prisma:push"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

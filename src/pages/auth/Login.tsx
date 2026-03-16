@@ -5,7 +5,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
@@ -19,9 +26,13 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname ?? "/";
+  const from = (location.state as any)?.from?.pathname ?? "/app";
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginForm>();
   const [magicEmail, setMagicEmail] = useState("");
   const [magicSent, setMagicSent] = useState(false);
   const [magicLoading, setMagicLoading] = useState(false);
@@ -30,7 +41,12 @@ export default function LoginPage() {
     try {
       const result = await login(data.email, data.password);
       if (result.requires2FA && result.twoFactorToken) {
-        navigate("/auth/2fa", { state: { twoFactorToken: result.twoFactorToken } });
+        navigate("/auth/2fa", {
+          state: {
+            twoFactorToken: result.twoFactorToken,
+            from: (location.state as any)?.from,
+          },
+        });
         return;
       }
       navigate(from, { replace: true });
@@ -48,7 +64,11 @@ export default function LoginPage() {
     if (!magicEmail) return;
     setMagicLoading(true);
     try {
-      await api.post("/api/auth/magic-link", { email: magicEmail }, { skipAuth: true });
+      await api.post(
+        "/api/auth/magic-link",
+        { email: magicEmail },
+        { skipAuth: true },
+      );
       setMagicSent(true);
       toast.success("Magic link sent! Check your inbox.");
     } catch {
@@ -76,13 +96,20 @@ export default function LoginPage() {
                 placeholder="you@example.com"
                 {...register("email", { required: "Email is required" })}
               />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              {errors.email && (
+                <p className="text-xs text-destructive">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link to="/auth/forgot-password" className="text-xs text-muted-foreground hover:underline">
+                <Link
+                  to="/auth/forgot-password"
+                  className="text-xs text-muted-foreground hover:underline"
+                >
                   Forgot password?
                 </Link>
               </div>
@@ -92,7 +119,11 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 {...register("password", { required: "Password is required" })}
               />
-              {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+              {errors.password && (
+                <p className="text-xs text-destructive">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -103,16 +134,17 @@ export default function LoginPage() {
           <div className="relative">
             <Separator />
             <span className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-card px-2 text-xs text-muted-foreground">or sign in with a magic link</span>
+              <span className="bg-card px-2 text-xs text-muted-foreground">
+                or sign in with a magic link
+              </span>
             </span>
           </div>
 
-          {magicSent ? (
+          {magicSent ?
             <p className="text-center text-sm text-muted-foreground">
               Check your inbox for a magic link.
             </p>
-          ) : (
-            <div className="flex gap-2">
+          : <div className="flex gap-2">
               <Input
                 type="email"
                 placeholder="your@email.com"
@@ -120,11 +152,15 @@ export default function LoginPage() {
                 onChange={(e) => setMagicEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMagicLink()}
               />
-              <Button variant="outline" onClick={sendMagicLink} disabled={magicLoading || !magicEmail}>
+              <Button
+                variant="outline"
+                onClick={sendMagicLink}
+                disabled={magicLoading || !magicEmail}
+              >
                 {magicLoading ? "..." : "Send"}
               </Button>
             </div>
-          )}
+          }
         </CardContent>
 
         <CardFooter>

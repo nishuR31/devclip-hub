@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { PLANS, formatINR, type PlanTier } from "@/lib/plans";
+import { PLANS, type PlanTier } from "@/lib/plans";
+import { fetchPublicPlans, type PublicPlan } from "@/lib/publicPlans";
 import {
   convertFromINR,
   type SupportedCurrency,
@@ -31,76 +32,133 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { api, ApiError } from "@/lib/api";
 import { toast } from "sonner";
 
+// ── Razorpay globals ──────────────────────────────────────────────────────────
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, unknown>) => {
+      open(): void;
+      on(event: string, handler: (response: unknown) => void): void;
+    };
+  }
+}
+
 const CURRENCIES: SupportedCurrency[] = ["INR", "USD", "EUR", "GBP"];
 
 export default function Pricing() {
-  const { isAuthenticated } = useAuth();
-  const { plan: currentPlan } = useSubscription();
+  const { isAuthenticated, user } = useAuth();
+  const { plan: currentPlan, refetch: refetchSubscription } = useSubscription();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [yearly, setYearly] = useState(false);
   const [currency, setCurrency] = useState<SupportedCurrency>("INR");
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [apiPlans, setApiPlans] = useState<Record<string, PublicPlan>>({});
 
+  // Fetch Razorpay plan IDs from the backend
+  useEffect(() => {
+    fetchPublicPlans()
+      .then((plans) => {
+        const map: Record<string, PublicPlan> = {};
+        for (const p of plans) map[p.id] = p;
+        setApiPlans(map);
+      })
+      .catch(() => {
+        // Non-fatal — paid upgrade will fail gracefully
+      });
+  }, []);
+
+  // Convert prices to selected currency
   useEffect(() => {
     (async () => {
       const updated: Record<string, string> = {};
       for (const p of PLANS) {
-        const paise = yearly ? p.yearlyINR : p.monthlyINR;
+        const serverPlan = apiPlans[p.id];
+        const paise =
+          yearly ?
+            (serverPlan?.yearlyINR ?? p.yearlyINR)
+          : (serverPlan?.monthlyINR ?? p.monthlyINR);
         updated[p.id] = await convertFromINR(paise, currency);
       }
       setPrices(updated);
     })();
-  }, [currency, yearly]);
+  }, [apiPlans, currency, yearly]);
 
-  const handleUpgrade = async (planId: PlanTier, priceId: string) => {
+  const requireLogin = () => {
+    navigate("/auth/login", { state: { from: location } });
+  };
+
+  const handleUpgrade = async (planId: PlanTier) => {
     if (!isAuthenticated) {
-      navigate("/auth/register");
+      requireLogin();
       return;
     }
+
+    const apiPlan = apiPlans[planId];
+    const rzpPlanId =
+      yearly ? apiPlan?.rzpPlanIds?.yearly : apiPlan?.rzpPlanIds?.monthly;
+
+    if (!rzpPlanId) {
+      toast.error("Plan not available. Please try again later.");
+      return;
+    }
+
     setLoadingPlan(planId);
     try {
-      const { url } = await api.post<{ url: string }>(
-        "/api/payments/checkout",
-        {
-          priceId,
+      const { subscriptionId, keyId } = await api.post<{
+        subscriptionId: string;
+        keyId: string;
+      }>("/api/payments/checkout", { planId: rzpPlanId });
+
+      const rzp = new window.Razorpay({
+        key: keyId,
+        subscription_id: subscriptionId,
+        name: "DevClipboard Hub",
+        description: `${planId} plan — ${yearly ? "yearly" : "monthly"}`,
+        prefill: { email: user?.email ?? "" },
+        theme: { color: "#6366f1" },
+        handler: async (response: unknown) => {
+          const {
+            razorpay_payment_id,
+            razorpay_subscription_id,
+            razorpay_signature,
+          } = response as {
+            razorpay_payment_id: string;
+            razorpay_subscription_id: string;
+            razorpay_signature: string;
+          };
+          try {
+            await api.post("/api/payments/verify", {
+              razorpay_payment_id,
+              razorpay_subscription_id,
+              razorpay_signature,
+            });
+            toast.success("Subscription activated!");
+            await refetchSubscription();
+            navigate("/account/billing");
+          } catch (err) {
+            toast.error(
+              err instanceof ApiError ?
+                err.message
+              : "Payment verification failed. Contact support.",
+            );
+          }
         },
-      );
-      window.location.href = url;
+        modal: {
+          ondismiss: () => setLoadingPlan(null),
+        },
+      });
+
+      rzp.open();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Checkout failed");
-    } finally {
       setLoadingPlan(null);
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b">
-        <Link to="/" className="font-semibold text-lg">
-          DevClipboard Hub
-        </Link>
-        {isAuthenticated ?
-          <Link to="/">
-            <Button variant="outline" size="sm">
-              Back to app
-            </Button>
-          </Link>
-        : <div className="flex gap-2">
-            <Link to="/auth/login">
-              <Button variant="ghost" size="sm">
-                Sign in
-              </Button>
-            </Link>
-            <Link to="/auth/register">
-              <Button size="sm">Get started</Button>
-            </Link>
-          </div>
-        }
-      </div>
-
       <div className="max-w-5xl mx-auto px-4 py-16 space-y-10">
         {/* Title */}
         <div className="text-center space-y-3">
@@ -144,8 +202,13 @@ export default function Pricing() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((p) => {
             const isCurrent = isAuthenticated && currentPlan === p.id;
+            const serverPlan = apiPlans[p.id];
+            const billingPaise =
+              yearly ?
+                (serverPlan?.yearlyINR ?? p.yearlyINR)
+              : (serverPlan?.monthlyINR ?? p.monthlyINR);
             const priceStr =
-              prices[p.id] ?? (p.monthlyINR === 0 ? "Free" : "...");
+              prices[p.id] ?? (billingPaise === 0 ? "Free" : "...");
 
             return (
               <Card
@@ -166,7 +229,7 @@ export default function Pricing() {
                   <CardTitle className="text-lg">{p.name}</CardTitle>
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-bold">{priceStr}</span>
-                    {p.monthlyINR > 0 && (
+                    {billingPaise > 0 && (
                       <span className="text-muted-foreground text-sm">
                         /{yearly ? "yr" : "mo"}
                       </span>
@@ -195,11 +258,13 @@ export default function Pricing() {
                       className="w-full"
                       variant={isCurrent ? "outline" : "default"}
                       disabled={isCurrent}
-                      onClick={() =>
-                        !isAuthenticated && navigate("/auth/register")
-                      }
+                      onClick={() => !isAuthenticated && requireLogin()}
                     >
-                      {isCurrent ? "Current plan" : "Get started free"}
+                      {isCurrent ?
+                        "Current plan"
+                      : isAuthenticated ?
+                        "Get started free"
+                      : "Login to start"}
                     </Button>
                   : <Button
                       className="w-full"
@@ -210,15 +275,10 @@ export default function Pricing() {
                         : "secondary"
                       }
                       disabled={isCurrent || loadingPlan === p.id}
-                      onClick={() => {
-                        // In a real app, pick monthly vs yearly price ID from config
-                        // Using placeholder — replace with actual Stripe price IDs from env
-                        const priceId = `price_${p.id.toLowerCase()}_${yearly ? "yearly" : "monthly"}`;
-                        handleUpgrade(p.id as PlanTier, priceId);
-                      }}
+                      onClick={() => handleUpgrade(p.id as PlanTier)}
                     >
                       {loadingPlan === p.id ?
-                        "Redirecting..."
+                        "Opening checkout..."
                       : isCurrent ?
                         "Current plan"
                       : "Upgrade"}

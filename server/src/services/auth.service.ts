@@ -201,8 +201,9 @@ export async function login(
   }
 
   const plan = await getUserPlan(user.id);
-  const tokens = await issueTokens(user.id, email, plan, userAgent, ip);
-  return { ...tokens, user: sanitizeUser(user, plan) };
+  const {accessToken,refreshToken} = await issueTokens(user.id, email, plan, userAgent, ip);
+  res.cookie("devClip",{})
+  return { accessToken, user: sanitizeUser(user, plan) };
 }
 
 // ── 2FA TOTP Verify ───────────────────────────────────────────────────────────

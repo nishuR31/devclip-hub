@@ -7,10 +7,12 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { GuestGuard } from "@/components/auth/GuestGuard";
+import { AppChrome } from "@/components/layout/AppChrome";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Pricing from "./pages/Pricing";
+import LandingPage from "./pages/Landing";
 import LoginPage from "./pages/auth/Login";
 import RegisterPage from "./pages/auth/Register";
 import VerifyEmailPage from "./pages/auth/VerifyEmail";
@@ -37,46 +39,83 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Public */}
-              <Route path="/pricing" element={<Pricing />} />
+              <Route element={<AppChrome />}>
+                {/* Public */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/pricing" element={<Pricing />} />
 
-              {/* Guest-only */}
-              <Route
-                path="/auth/login"
-                element={<GuestGuard><LoginPage /></GuestGuard>}
-              />
-              <Route
-                path="/auth/register"
-                element={<GuestGuard><RegisterPage /></GuestGuard>}
-              />
-              <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
-              <Route
-                path="/auth/forgot-password"
-                element={<GuestGuard><ForgotPasswordPage /></GuestGuard>}
-              />
-              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/auth/magic" element={<MagicLinkPage />} />
-              <Route path="/auth/2fa" element={<TwoFactorPage />} />
+                {/* Guest-only */}
+                <Route
+                  path="/auth/login"
+                  element={
+                    <GuestGuard>
+                      <LoginPage />
+                    </GuestGuard>
+                  }
+                />
+                <Route
+                  path="/auth/register"
+                  element={
+                    <GuestGuard>
+                      <RegisterPage />
+                    </GuestGuard>
+                  }
+                />
+                <Route
+                  path="/auth/verify-email"
+                  element={<VerifyEmailPage />}
+                />
+                <Route
+                  path="/auth/forgot-password"
+                  element={
+                    <GuestGuard>
+                      <ForgotPasswordPage />
+                    </GuestGuard>
+                  }
+                />
+                <Route
+                  path="/auth/reset-password"
+                  element={<ResetPasswordPage />}
+                />
+                <Route path="/auth/magic" element={<MagicLinkPage />} />
+                <Route path="/auth/2fa" element={<TwoFactorPage />} />
 
-              {/* Protected */}
-              <Route
-                path="/"
-                element={<AuthGuard><Index /></AuthGuard>}
-              />
-              <Route
-                path="/account"
-                element={<AuthGuard><AccountPage /></AuthGuard>}
-              />
-              <Route
-                path="/account/billing"
-                element={<AuthGuard><BillingPage /></AuthGuard>}
-              />
-              <Route
-                path="/account/security"
-                element={<AuthGuard><SecurityPage /></AuthGuard>}
-              />
+                {/* Protected */}
+                <Route
+                  path="/app"
+                  element={
+                    <AuthGuard>
+                      <Index />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/account"
+                  element={
+                    <AuthGuard>
+                      <AccountPage />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/account/billing"
+                  element={
+                    <AuthGuard>
+                      <BillingPage />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/account/security"
+                  element={
+                    <AuthGuard>
+                      <SecurityPage />
+                    </AuthGuard>
+                  }
+                />
 
-              <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
             </Routes>
           </BrowserRouter>
         </TooltipProvider>

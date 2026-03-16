@@ -34,7 +34,7 @@ export default function MagicLinkPage() {
         setAccessToken(data.accessToken);
         await refreshUser();
         toast.success("Signed in successfully!");
-        navigate("/");
+        navigate("/app");
       })
       .catch((err) => {
         toast.error(
