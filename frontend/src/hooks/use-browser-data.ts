@@ -55,10 +55,13 @@ function getStorageItems(storage: Storage): StorageItem[] {
 function parseCookies(): CookieItem[] {
   try {
     if (!document.cookie) return [];
-    return document.cookie.split(";").map((c) => {
-      const [name, ...rest] = c.trim().split("=");
-      return { name: name.trim(), value: decodeURIComponent(rest.join("=")) };
-    }).filter((c) => c.name);
+    return document.cookie
+      .split(";")
+      .map((c) => {
+        const [name, ...rest] = c.trim().split("=");
+        return { name: name.trim(), value: decodeURIComponent(rest.join("=")) };
+      })
+      .filter((c) => c.name);
   } catch {
     return [];
   }
@@ -84,19 +87,28 @@ function getBrowserInfo(): BrowserInfo {
     vendor: navigator.vendor || "Unknown",
     hardwareConcurrency: navigator.hardwareConcurrency || 0,
     deviceMemory: nav.deviceMemory || null,
-    connection: conn ? {
-      effectiveType: conn.effectiveType || "unknown",
-      downlink: conn.downlink || 0,
-      rtt: conn.rtt || 0,
-    } : null,
+    connection:
+      conn ?
+        {
+          effectiveType: conn.effectiveType || "unknown",
+          downlink: conn.downlink || 0,
+          rtt: conn.rtt || 0,
+        }
+      : null,
   };
 }
 
 export function useBrowserData() {
-  const [localStorageItems, setLocalStorageItems] = useState<StorageItem[]>(() => getStorageItems(localStorage));
-  const [sessionStorageItems, setSessionStorageItems] = useState<StorageItem[]>(() => getStorageItems(sessionStorage));
+  const [localStorageItems, setLocalStorageItems] = useState<StorageItem[]>(
+    () => getStorageItems(localStorage),
+  );
+  const [sessionStorageItems, setSessionStorageItems] = useState<StorageItem[]>(
+    () => getStorageItems(sessionStorage),
+  );
   const [cookies, setCookies] = useState<CookieItem[]>(() => parseCookies());
-  const [browserInfo, setBrowserInfo] = useState<BrowserInfo>(() => getBrowserInfo());
+  const [browserInfo, setBrowserInfo] = useState<BrowserInfo>(() =>
+    getBrowserInfo(),
+  );
 
   const refresh = useCallback(() => {
     setLocalStorageItems(getStorageItems(localStorage));
@@ -121,54 +133,80 @@ export function useBrowserData() {
     };
   }, [refresh]);
 
-  const setStorageValue = useCallback((storage: "local" | "session", key: string, value: string) => {
-    const s = storage === "local" ? localStorage : sessionStorage;
-    s.setItem(key, value);
-    refresh();
-  }, [refresh]);
+  const setStorageValue = useCallback(
+    (storage: "local" | "session", key: string, value: string) => {
+      const s = storage === "local" ? localStorage : sessionStorage;
+      s.setItem(key, value);
+      refresh();
+    },
+    [refresh],
+  );
 
-  const deleteStorageItem = useCallback((storage: "local" | "session", key: string) => {
-    const s = storage === "local" ? localStorage : sessionStorage;
-    s.removeItem(key);
-    refresh();
-  }, [refresh]);
+  const deleteStorageItem = useCallback(
+    (storage: "local" | "session", key: string) => {
+      const s = storage === "local" ? localStorage : sessionStorage;
+      s.removeItem(key);
+      refresh();
+    },
+    [refresh],
+  );
 
-  const deleteCookie = useCallback((name: string) => {
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-    refresh();
-  }, [refresh]);
+  const deleteCookie = useCallback(
+    (name: string) => {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+      refresh();
+    },
+    [refresh],
+  );
 
-  const exportData = useCallback((type: "localStorage" | "sessionStorage" | "cookies", format: "json" | "csv" | "txt") => {
-    let data: any[];
-    if (type === "localStorage") data = localStorageItems;
-    else if (type === "sessionStorage") data = sessionStorageItems;
-    else data = cookies;
+  const exportData = useCallback(
+    (
+      type: "localStorage" | "sessionStorage" | "cookies" | "sharedStorage",
+      format: "json" | "csv" | "txt",
+    ) => {
+      let data: any[];
+      if (type === "localStorage") data = localStorageItems;
+      else if (type === "sessionStorage") data = sessionStorageItems;
+      else if (type === "cookies") data = cookies;
+      else data = [];
 
-    if (data.length === 0) return;
+      if (data.length === 0) return;
 
-    let content: string;
-    let mime: string;
-    if (format === "json") {
-      content = JSON.stringify(data, null, 2);
-      mime = "application/json";
-    } else if (format === "csv") {
-      const headers = Object.keys(data[0] || {}).join(",");
-      const rows = data.map((d) => Object.values(d).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
-      content = [headers, ...rows].join("\n");
-      mime = "text/csv";
-    } else {
-      content = data.map((d) => Object.entries(d).map(([k, v]) => `${k}: ${v}`).join("\n")).join("\n\n");
-      mime = "text/plain";
-    }
+      let content: string;
+      let mime: string;
+      if (format === "json") {
+        content = JSON.stringify(data, null, 2);
+        mime = "application/json";
+      } else if (format === "csv") {
+        const headers = Object.keys(data[0] || {}).join(",");
+        const rows = data.map((d) =>
+          Object.values(d)
+            .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+            .join(","),
+        );
+        content = [headers, ...rows].join("\n");
+        mime = "text/csv";
+      } else {
+        content = data
+          .map((d) =>
+            Object.entries(d)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join("\n"),
+          )
+          .join("\n\n");
+        mime = "text/plain";
+      }
 
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${type}.${format}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [localStorageItems, sessionStorageItems, cookies]);
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${type}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    [localStorageItems, sessionStorageItems, cookies],
+  );
 
   return {
     localStorageItems,
