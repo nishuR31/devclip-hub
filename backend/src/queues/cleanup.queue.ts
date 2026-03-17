@@ -49,5 +49,9 @@ export function startCleanupWorker() {
     { connection: bullRedis as any },
   );
 
+  worker.on("error", (err) => {
+    console.error("[CleanupQueue] Worker connection error:", err.message);
+  });
+
   return worker;
 }

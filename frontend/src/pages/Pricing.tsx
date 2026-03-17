@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,8 +47,6 @@ const CURRENCIES: SupportedCurrency[] = ["INR", "USD", "EUR", "GBP"];
 export default function Pricing() {
   const { isAuthenticated, user } = useAuth();
   const { plan: currentPlan, refetch: refetchSubscription } = useSubscription();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const [yearly, setYearly] = useState(false);
   const [currency, setCurrency] = useState<SupportedCurrency>("INR");
@@ -85,13 +83,9 @@ export default function Pricing() {
     })();
   }, [apiPlans, currency, yearly]);
 
-  const requireLogin = () => {
-    navigate("/auth/login", { state: { from: location } });
-  };
-
   const handleUpgrade = async (planId: PlanTier) => {
     if (!isAuthenticated) {
-      requireLogin();
+      toast.info("Please sign in to continue with paid plan checkout.");
       return;
     }
 
@@ -254,18 +248,10 @@ export default function Pricing() {
 
                 <CardFooter>
                   {p.id === "FREE" ?
-                    <Button
-                      className="w-full"
-                      variant={isCurrent ? "outline" : "default"}
-                      disabled={isCurrent}
-                      onClick={() => !isAuthenticated && requireLogin()}
-                    >
-                      {isCurrent ?
-                        "Current plan"
-                      : isAuthenticated ?
-                        "Get started free"
-                      : "Login to start"}
-                    </Button>
+                    <div className="w-full rounded-md border bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
+                      Free users can use workspace without login (25 clipboard +
+                      25 snippets).
+                    </div>
                   : <Button
                       className="w-full"
                       variant={

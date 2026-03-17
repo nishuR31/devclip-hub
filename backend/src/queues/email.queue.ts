@@ -73,6 +73,10 @@ export function startEmailWorker() {
     }
   });
 
+  worker.on("error", (err) => {
+    console.error("[EmailQueue] Worker connection error:", err.message);
+  });
+
   return worker;
 }
 

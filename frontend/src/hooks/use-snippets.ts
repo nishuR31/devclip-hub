@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGuest } from "@/contexts/GuestContext";
 import { PLAN_HIERARCHY, type PlanTier } from "@/lib/plans";
 
 export interface SnippetEntry {
@@ -39,19 +40,23 @@ function writeLocalSnippets(snippets: SnippetEntry[]) {
 
 export function useSnippets() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { guestSnippetAdded, incrementSnippetAdded, openAuthGate } = useGuest();
 
   const plan = (user?.plan as PlanTier | undefined) ?? "FREE";
   const isPaid = PLAN_HIERARCHY[plan] >= PLAN_HIERARCHY.STARTER;
   const isTeam = plan === "TEAM";
   const canEdit = isPaid;
   const limit = getPlanLimit(plan);
+  const guestAtLimit = !isAuthenticated && guestSnippetAdded >= 25;
 
   const [localSnippets, setLocalSnippets] = useState<SnippetEntry[]>(() =>
     readLocalSnippets(),
   );
 
-  const { data: snippets = [], isLoading } = useQuery({
+  const { data: snippets = [] as SnippetEntry[], isLoading } = useQuery<
+    SnippetEntry[]
+  >({
     queryKey: [...QKEY, plan],
     queryFn: () =>
       isPaid ?
@@ -88,7 +93,16 @@ export function useSnippets() {
   const addSnippet = useCallback(
     (title: string, content: string, tags: string[] = [], masked = false) => {
       if (!isPaid) {
-        if (localSnippets.length >= 25) return;
+        // Guest: cookie-based counter prevents localStorage-clear exploitation
+        if (!isAuthenticated && guestAtLimit) {
+          openAuthGate("snippet-limit");
+          return;
+        }
+        if (!isAuthenticated && localSnippets.length >= 25) {
+          openAuthGate("snippet-limit");
+          return;
+        }
+        if (isAuthenticated && localSnippets.length >= 25) return;
         const entry: SnippetEntry = {
           id: crypto.randomUUID(),
           title,
@@ -101,11 +115,20 @@ export function useSnippets() {
         const next = [entry, ...localSnippets].slice(0, 25);
         setLocalSnippets(next);
         writeLocalSnippets(next);
+        if (!isAuthenticated) incrementSnippetAdded();
         return;
       }
       createMut.mutate({ title, content, tags, masked });
     },
-    [createMut, isPaid, localSnippets],
+    [
+      createMut,
+      isPaid,
+      isAuthenticated,
+      localSnippets,
+      guestAtLimit,
+      openAuthGate,
+      incrementSnippetAdded,
+    ],
   );
 
   const updateSnippet = useCallback(

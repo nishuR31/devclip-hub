@@ -33,13 +33,17 @@ import {
   CreditCard,
   LogOut,
   Settings,
+  LogIn,
+  Zap,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGuest } from "@/contexts/GuestContext";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
+  const { openAuthGate, guestClipboardAdded, guestSnippetAdded } = useGuest();
   const [darkMode, setDarkMode] = useState(true);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
@@ -252,9 +256,9 @@ const Index = () => {
                 <div className="flex items-center justify-center gap-1.5 mb-0.5">
                   <Shield className="h-3.5 w-3.5 text-primary" />
                   <span className="text-[10px] font-semibold text-primary">
-                    {workspaceCapabilities.source === "db+redis"
-                      ? "Cloud + Redis Sync"
-                      : "Local Storage Mode"}
+                    {workspaceCapabilities.source === "db+redis" ?
+                      "Cloud + Redis Sync"
+                    : "Local Storage Mode"}
                   </span>
                 </div>
                 {workspaceCapabilities.canUseTeams && (
@@ -388,34 +392,65 @@ const Index = () => {
               <Sun className="h-3.5 w-3.5" />
             : <Moon className="h-3.5 w-3.5" />}
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-7 gap-1.5 px-2 text-xs">
-                <User className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline max-w-[120px] truncate">
-                  {user?.name ?? user?.email}
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={() => navigate("/account")}>
-                <Settings className="mr-2 h-3.5 w-3.5" /> Account
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/account/billing")}>
-                <CreditCard className="mr-2 h-3.5 w-3.5" /> Billing
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={async () => {
-                  await logout();
-                  navigate("/");
-                }}
-                className="text-destructive focus:text-destructive"
+          {/* Guest: usage badge + Sign In / authenticated: user dropdown */}
+          {isAuthenticated ?
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-7 gap-1.5 px-2 text-xs">
+                  <User className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline max-w-[120px] truncate">
+                    {user?.name ?? user?.email}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => navigate("/account")}>
+                  <Settings className="mr-2 h-3.5 w-3.5" /> Account
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/account/billing")}>
+                  <CreditCard className="mr-2 h-3.5 w-3.5" /> Billing
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await logout();
+                    navigate("/");
+                  }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-3.5 w-3.5" /> Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          : <div className="flex items-center gap-1.5">
+              {/* Show usage pill so guests know how much quota they've used */}
+              <span
+                className="hidden sm:inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                title="Free guest quota"
+                onClick={() => openAuthGate("upgrade")}
               >
-                <LogOut className="mr-2 h-3.5 w-3.5" /> Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Zap className="h-2.5 w-2.5 text-amber-400" />
+                {Math.min(guestClipboardAdded, 25)}/25 free
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={() => openAuthGate(null)}
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Sign in</span>
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={() => openAuthGate("upgrade")}
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Upgrade</span>
+              </Button>
+            </div>
+          }
         </div>
       </header>
 
@@ -558,15 +593,15 @@ const Index = () => {
               <div className="flex items-center justify-center gap-2 mb-1">
                 <Shield className="w-4 h-4 text-primary" />
                 <span className="text-xs font-semibold text-primary">
-                  {workspaceCapabilities.source === "db+redis"
-                    ? "Cloud + Redis Sync"
-                    : "Local Storage Mode"}
+                  {workspaceCapabilities.source === "db+redis" ?
+                    "Cloud + Redis Sync"
+                  : "Local Storage Mode"}
                 </span>
               </div>
               <p className="text-[10px] lg:text-xs text-muted-foreground">
-                {workspaceCapabilities.source === "db+redis"
-                  ? "Paid workspace is optimized with DB storage and Redis cache."
-                  : "Free workspace uses localStorage with preview-first mode."}
+                {workspaceCapabilities.source === "db+redis" ?
+                  "Paid workspace is optimized with DB storage and Redis cache."
+                : "Free workspace uses localStorage with preview-first mode."}
                 {workspaceCapabilities.canUseTeams && (
                   <> Team members: {teamCount}</>
                 )}

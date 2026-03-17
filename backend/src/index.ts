@@ -15,6 +15,7 @@ import webhooksRouter from "./routes/webhooks";
 import clipboardRouter from "./routes/clipboard";
 import snippetsRouter from "./routes/snippets";
 import workspaceRouter from "./routes/workspace";
+import guestRouter from "./routes/guest";
 
 // Queues
 import { startEmailWorker } from "./queues/email.queue";
@@ -55,6 +56,7 @@ app.use("/api/payments", paymentsRouter);
 app.use("/api/clipboard", clipboardRouter);
 app.use("/api/snippets", snippetsRouter);
 app.use("/api/workspace", workspaceRouter);
+app.use("/api/guest", guestRouter);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {

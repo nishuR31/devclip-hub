@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGuest } from "@/contexts/GuestContext";
 import { PLAN_HIERARCHY, type PlanTier } from "@/lib/plans";
 
 export interface ClipboardEntry {
@@ -51,12 +52,17 @@ function writeLocalEntries(entries: ClipboardEntry[]) {
 
 export function useClipboard() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { guestClipboardAdded, incrementClipboardAdded, openAuthGate } =
+    useGuest();
   const plan = (user?.plan as PlanTier | undefined) ?? "FREE";
   const isPaid = PLAN_HIERARCHY[plan] >= PLAN_HIERARCHY.STARTER;
   const isTeam = plan === "TEAM";
   const canEdit = isPaid;
   const limit = getPlanLimit(plan);
+  // For guests: the cumulative cookie counter is the authoritative cap
+  // so clearing localStorage doesn't reset their quota.
+  const guestAtLimit = !isAuthenticated && guestClipboardAdded >= 25;
 
   const [currentClipboard, setCurrentClipboard] = useState("");
   const [clipboardError, setClipboardError] = useState<string | null>(null);
@@ -122,10 +128,21 @@ export function useClipboard() {
       if (!text.trim()) return;
 
       if (!isPaid) {
-        if (localEntries.length >= 25) {
+        // Guest: check cookie-based counter (survives localStorage clears)
+        if (!isAuthenticated && guestAtLimit) {
+          openAuthGate("clipboard-limit");
+          return;
+        }
+        // Authenticated FREE user: check current item count
+        if (isAuthenticated && localEntries.length >= 25) {
           setClipboardError(
             "Free plan limit reached (25). Upgrade to store more.",
           );
+          return;
+        }
+        // Guest: also block if localStorage is already full
+        if (!isAuthenticated && localEntries.length >= 25) {
+          openAuthGate("clipboard-limit");
           return;
         }
         const entry: ClipboardEntry = {
@@ -140,6 +157,8 @@ export function useClipboard() {
         const next = [entry, ...localEntries].slice(0, 25);
         setLocalEntries(next);
         writeLocalEntries(next);
+        // Track cumulative count in cookie for guests
+        if (!isAuthenticated) incrementClipboardAdded();
         return;
       }
 
@@ -151,7 +170,16 @@ export function useClipboard() {
         tags: [],
       });
     },
-    [createMut, entries, isPaid, localEntries],
+    [
+      createMut,
+      entries,
+      isPaid,
+      isAuthenticated,
+      localEntries,
+      guestAtLimit,
+      openAuthGate,
+      incrementClipboardAdded,
+    ],
   );
 
   const readClipboard = useCallback(async () => {

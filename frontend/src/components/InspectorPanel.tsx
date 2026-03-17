@@ -280,21 +280,35 @@ function BrowserInfoPanel({ info }: { info: BrowserInfo }) {
   };
 
   const getOSName = (ua: string) => {
+    const uaPlatform = info.userAgentData?.platform?.toLowerCase();
+    const uaPlatformVersion = info.userAgentData?.platformVersion;
+
+    if (uaPlatform === "android") {
+      if (uaPlatformVersion) {
+        const major = uaPlatformVersion.split(".")[0];
+        return major ? `Android ${major}` : "Android";
+      }
+      return "Android";
+    }
+
     if (ua.includes("Android")) {
       const match = ua.match(/Android\s([\d.]+)/);
-      return `Android ${match?.[1] || ""}`;
+      return match?.[1] ? `Android ${match[1]}` : "Android";
     }
     if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
     if (ua.includes("Windows")) return "Windows";
     if (ua.includes("Mac")) return "macOS";
     if (ua.includes("Linux")) return "Linux";
+    if (info.userAgentData?.platform) return info.userAgentData.platform;
     return info.platform;
   };
 
   const browser = getBrowserName(info.userAgent);
   const os = getOSName(info.userAgent);
   const isMobileDevice =
-    info.maxTouchPoints > 0 || /Android|iPhone|iPad/i.test(info.userAgent);
+    info.userAgentData?.mobile === true ||
+    info.maxTouchPoints > 0 ||
+    /Android|iPhone|iPad/i.test(info.userAgent);
 
   const rows = [
     { icon: Globe, label: "Browser", value: browser },
@@ -351,9 +365,16 @@ function BrowserInfoPanel({ info }: { info: BrowserInfo }) {
         <>
           <div className="flex items-center gap-2 rounded-md border bg-card p-2.5 text-xs">
             <Wifi className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="text-muted-foreground">Connection</span>
+            <span className="text-muted-foreground">Network (estimate)</span>
             <span className="ml-auto font-medium text-foreground">
               {info.connection.effectiveType}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 rounded-md border bg-card p-2.5 text-xs">
+            <Wifi className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="text-muted-foreground">Transport</span>
+            <span className="ml-auto font-medium text-foreground">
+              {info.connection.transportType || "unknown"}
             </span>
           </div>
           <div className="flex items-center gap-2 rounded-md border bg-card p-2.5 text-xs">
@@ -371,6 +392,10 @@ function BrowserInfoPanel({ info }: { info: BrowserInfo }) {
           {info.userAgent}
         </p>
       </div>
+      <p className="text-[10px] text-muted-foreground px-1">
+        Network and OS details are browser-reported hints. Wi-Fi SSID/name and
+        exact transport are often hidden by browser privacy rules.
+      </p>
     </div>
   );
 }

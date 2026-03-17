@@ -191,9 +191,9 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-wrap justify-center gap-3">
-              <Link to={isAuthenticated ? "/app" : "/auth/register"}>
+              <Link to="/app">
                 <Button size="lg" className="gap-2 px-6">
-                  {isAuthenticated ? "Open workspace" : "Start for free"}
+                  {isAuthenticated ? "Open workspace" : "Try free — no signup"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -347,19 +347,12 @@ export default function LandingPage() {
               every project.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link to={isAuthenticated ? "/app" : "/auth/register"}>
+              <Link to="/app">
                 <Button size="lg" className="gap-2 px-8">
-                  {isAuthenticated ? "Go to workspace" : "Create free account"}
+                  {isAuthenticated ? "Go to workspace" : "Try free — no signup"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              {!isAuthenticated && (
-                <Link to="/auth/login">
-                  <Button size="lg" variant="ghost">
-                    Log in
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
         </section>

@@ -15,6 +15,11 @@ export interface CookieItem {
 
 export interface BrowserInfo {
   userAgent: string;
+  userAgentData: {
+    platform?: string;
+    platformVersion?: string;
+    mobile?: boolean;
+  } | null;
   platform: string;
   language: string;
   languages: string[];
@@ -32,6 +37,7 @@ export interface BrowserInfo {
   deviceMemory: number | null;
   connection: {
     effectiveType: string;
+    transportType: string;
     downlink: number;
     rtt: number;
   } | null;
@@ -70,8 +76,23 @@ function parseCookies(): CookieItem[] {
 function getBrowserInfo(): BrowserInfo {
   const nav = navigator as any;
   const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
+  const uaData = nav.userAgentData;
+
   return {
     userAgent: navigator.userAgent,
+    userAgentData:
+      uaData ?
+        {
+          platform:
+            typeof uaData.platform === "string" ? uaData.platform : undefined,
+          platformVersion:
+            typeof uaData.platformVersion === "string" ?
+              uaData.platformVersion
+            : undefined,
+          mobile:
+            typeof uaData.mobile === "boolean" ? uaData.mobile : undefined,
+        }
+      : null,
     platform: navigator.platform || "Unknown",
     language: navigator.language,
     languages: [...(navigator.languages || [])],
@@ -91,6 +112,7 @@ function getBrowserInfo(): BrowserInfo {
       conn ?
         {
           effectiveType: conn.effectiveType || "unknown",
+          transportType: conn.type || "unknown",
           downlink: conn.downlink || 0,
           rtt: conn.rtt || 0,
         }

@@ -3,7 +3,8 @@
   "private": true,
   "version": "1.1.0",
   "scripts": {
-    "dev": "concurrently -n frontend,backend -c cyan,yellow \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
+    "setup": "npm --prefix frontend install && npm --prefix backend install",
+    "dev": "concurrently -k -n frontend,backend -c cyan,yellow \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
     "build": "npm --prefix frontend run build",

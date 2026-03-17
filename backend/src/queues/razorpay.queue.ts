@@ -46,5 +46,9 @@ export function startRazorpayWorker() {
     );
   });
 
+  worker.on("error", (err) => {
+    console.error("[RazorpayQueue] Worker connection error:", err.message);
+  });
+
   return worker;
 }
